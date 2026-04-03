@@ -24,7 +24,15 @@ class EmbeddingService:
     def __init__(self):
         self._openai_client: Optional[object] = None
         self._local_model: Optional[object] = None
-        self._tokenizer = tiktoken.get_encoding("cl100k_base")
+        try:
+            self._tokenizer = tiktoken.get_encoding("cl100k_base")
+            self._tokenizer_encode = self._tokenizer.encode
+            self._tokenizer_decode = self._tokenizer.decode
+        except Exception:
+            # Offline/test fallback when tokenizer download is unavailable.
+            self._tokenizer = None
+            self._tokenizer_encode = lambda text: text.split()
+            self._tokenizer_decode = lambda tokens: " ".join(tokens)
 
     def _get_openai_client(self):
         if self._openai_client is None:
@@ -39,7 +47,7 @@ class EmbeddingService:
         return self._local_model
 
     def count_tokens(self, text: str) -> int:
-        return len(self._tokenizer.encode(text))
+        return len(self._tokenizer_encode(text))
 
     def chunk_text(self, text: str) -> list[str]:
         """
@@ -64,13 +72,13 @@ class EmbeddingService:
         current_sentences: list[str] = []
 
         for sentence in sentences:
-            sent_tokens = self._tokenizer.encode(sentence)
+            sent_tokens = self._tokenizer_encode(sentence)
             if len(current_tokens) + len(sent_tokens) > max_size and current_sentences:
                 chunks.append(" ".join(current_sentences))
                 # Overlap: keep trailing tokens to reconstruct overlap sentences
-                overlap_text = self._tokenizer.decode(current_tokens[-overlap:])
+                overlap_text = self._tokenizer_decode(current_tokens[-overlap:])
                 current_sentences = [overlap_text, sentence]
-                current_tokens = self._tokenizer.encode(overlap_text) + sent_tokens
+                current_tokens = self._tokenizer_encode(overlap_text) + sent_tokens
             else:
                 current_sentences.append(sentence)
                 current_tokens.extend(sent_tokens)

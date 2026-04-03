@@ -147,7 +147,7 @@ class Source(Base):
     platform: Mapped[str] = mapped_column(String(100), nullable=False)  # chatgpt, claude, cursor, etc.
     source_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     session_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    source_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )
