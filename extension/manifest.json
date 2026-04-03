@@ -1,0 +1,64 @@
+{
+  "manifest_version": 3,
+  "name": "AI Memory Layer",
+  "version": "1.0.0",
+  "description": "Universal persistent memory for AI tools — ChatGPT, Claude, Cursor, and more.",
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "alarms"
+  ],
+
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://cursor.sh/*",
+    "https://www.notion.so/*",
+    "http://localhost:8000/*"
+  ],
+
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*"
+      ],
+      "js": ["dist/chatgpt_content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["dist/claude_content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://www.notion.so/*"],
+      "js": ["dist/notion_content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

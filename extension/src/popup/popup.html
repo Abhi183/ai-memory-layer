@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Memory Layer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      width: 320px;
+      min-height: 400px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    .header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 16px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+    }
+    .logo { font-size: 20px; }
+    .title { font-size: 14px; font-weight: 600; }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #ef4444; margin-left: auto;
+    }
+    .status-dot.connected { background: #10b981; }
+
+    .section { padding: 16px; }
+    .section + .section { border-top: 1px solid #1e293b; }
+
+    label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px; }
+    input {
+      width: 100%; padding: 8px 10px;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 6px; color: #e2e8f0;
+      font-size: 13px; outline: none;
+    }
+    input:focus { border-color: #6366f1; }
+
+    button {
+      width: 100%; padding: 9px;
+      background: #6366f1; color: #fff;
+      border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 500;
+      cursor: pointer; margin-top: 8px;
+    }
+    button:hover { background: #4f46e5; }
+    button.secondary { background: #334155; }
+    button.secondary:hover { background: #475569; }
+    button.danger { background: #dc2626; }
+    button.danger:hover { background: #b91c1c; }
+
+    .stat {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 0;
+    }
+    .stat-label { font-size: 12px; color: #94a3b8; }
+    .stat-value { font-size: 13px; font-weight: 600; color: #a5b4fc; }
+
+    .message {
+      padding: 8px 10px; border-radius: 6px;
+      font-size: 12px; margin-top: 8px;
+    }
+    .message.error { background: #450a0a; color: #fca5a5; }
+    .message.success { background: #052e16; color: #86efac; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <span class="logo">🧠</span>
+    <span class="title">AI Memory Layer</span>
+    <span class="status-dot" id="statusDot"></span>
+  </div>
+
+  <!-- Login view -->
+  <div id="loginView" class="section">
+    <div style="margin-bottom: 12px;">
+      <label>Email</label>
+      <input type="email" id="emailInput" placeholder="you@example.com" />
+    </div>
+    <div style="margin-bottom: 4px;">
+      <label>Password</label>
+      <input type="password" id="passwordInput" placeholder="••••••••" />
+    </div>
+    <button id="loginBtn">Sign In</button>
+    <div id="loginMessage" class="message hidden"></div>
+  </div>
+
+  <!-- Dashboard view (shown when authenticated) -->
+  <div id="dashboardView" class="hidden">
+    <div class="section">
+      <div class="stat">
+        <span class="stat-label">Status</span>
+        <span class="stat-value" id="syncStatus">Active</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Memories captured</span>
+        <span class="stat-value" id="memoryCount">—</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Current platform</span>
+        <span class="stat-value" id="currentPlatform">—</span>
+      </div>
+    </div>
+    <div class="section">
+      <button class="secondary" id="openDashboardBtn">Open Dashboard</button>
+      <button class="danger" id="logoutBtn">Sign Out</button>
+    </div>
+  </div>
+
+  <script src="../dist/popup.js"></script>
+</body>
+</html>

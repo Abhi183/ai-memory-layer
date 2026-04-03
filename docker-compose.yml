@@ -1,0 +1,126 @@
+version: "3.9"
+
+# ── Local development stack ────────────────────────────────────────────────────
+# Starts: PostgreSQL + pgvector, Redis, FastAPI backend, Celery worker, Next.js
+#
+# Usage:
+#   docker compose up -d           # start all services
+#   docker compose logs -f backend # tail backend logs
+#   docker compose down -v         # stop and remove volumes
+
+networks:
+  memory_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+services:
+
+  # ── PostgreSQL with pgvector ─────────────────────────────────────────────────
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: memory_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: memuser
+      POSTGRES_PASSWORD: mempass
+      POSTGRES_DB: aimemory
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - memory_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memuser -d aimemory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ─────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: memory_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - memory_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ── FastAPI backend ───────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: memory_backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://memuser:mempass@db:5432/aimemory
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      DEBUG: "true"
+    ports:
+      - "8000:8000"
+    networks:
+      - memory_net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ── Celery worker ─────────────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: memory_worker
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://memuser:mempass@db:5432/aimemory
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+    networks:
+      - memory_net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.memory_worker.celery_app worker --loglevel=info --concurrency=4
+
+  # ── Next.js frontend ──────────────────────────────────────────────────────────
+  frontend:
+    image: node:20-alpine
+    container_name: memory_frontend
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    ports:
+      - "3000:3000"
+    networks:
+      - memory_net
+    depends_on:
+      - backend
+    command: sh -c "npm install && npm run dev"
