@@ -20,6 +20,7 @@ from typing import Optional
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from sqlalchemy.ext.asyncio import AsyncSession
+from openai import AsyncOpenAI
 
 from app.models.memory import Memory, MemoryEmbedding, MemoryStatus, MemoryType
 from app.services.embedding_service import embedding_service
@@ -141,7 +142,6 @@ class PipelineService:
         if not settings.openai_api_key:
             return []
         try:
-            from openai import AsyncOpenAI
             client = AsyncOpenAI(api_key=settings.openai_api_key)
             response = await client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -170,7 +170,6 @@ class PipelineService:
             # Naive truncation fallback
             return content[:200] + "..." if len(content) > 200 else content
         try:
-            from openai import AsyncOpenAI
             client = AsyncOpenAI(api_key=settings.openai_api_key)
             response = await client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -192,7 +191,6 @@ class PipelineService:
         if not settings.openai_api_key or not facts:
             return MemoryType.SHORT_TERM
         try:
-            from openai import AsyncOpenAI
             client = AsyncOpenAI(api_key=settings.openai_api_key)
             response = await client.chat.completions.create(
                 model="gpt-4o-mini",
