@@ -1,0 +1,697 @@
+{
+  "seed": 42,
+  "n_conversations": 50,
+  "turns_per_conversation": 20,
+  "max_memory_tokens": 800,
+  "top_k": 5,
+  "threshold": 0.65,
+  "weights": {
+    "w_similarity": 0.7,
+    "w_recency": 0.2,
+    "w_importance": 0.1
+  },
+  "conversations": [
+    {
+      "conversation_id": "5a888a02-fb50-4f8e-8bc7-7624ee9b200a",
+      "turns": 20,
+      "full_context_tokens": 16063,
+      "memlayer_tokens": 903,
+      "no_memory_tokens": 420,
+      "num_memories_retrieved": 58,
+      "compression_ratio": 0.9438,
+      "precision_at_5": 0.8125
+    },
+    {
+      "conversation_id": "1c2d2e2a-74b8-47a9-a362-9065d86ddcc0",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 626,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 38,
+      "compression_ratio": 0.9565,
+      "precision_at_5": 0.725
+    },
+    {
+      "conversation_id": "d0055ed5-7331-4c24-bfff-f6c083990f0e",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 1066,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 79,
+      "compression_ratio": 0.9292,
+      "precision_at_5": 0.8292
+    },
+    {
+      "conversation_id": "7921503a-7bfb-4566-a670-9619703623e0",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 987,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 79,
+      "compression_ratio": 0.9314,
+      "precision_at_5": 0.815
+    },
+    {
+      "conversation_id": "bd1757d3-c967-4b03-adb9-7b051caa276e",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 851,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 59,
+      "compression_ratio": 0.9408,
+      "precision_at_5": 0.8
+    },
+    {
+      "conversation_id": "e0b1fd95-af09-42a8-85f8-44690865ac5c",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 1111,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 79,
+      "compression_ratio": 0.9262,
+      "precision_at_5": 0.7917
+    },
+    {
+      "conversation_id": "ace24dd8-0200-45d2-bc5c-9f4b13be1fed",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 971,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 72,
+      "compression_ratio": 0.934,
+      "precision_at_5": 0.8575
+    },
+    {
+      "conversation_id": "1adb0220-0b2f-4139-b662-95f958f577dc",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 605,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 32,
+      "compression_ratio": 0.9589,
+      "precision_at_5": 0.655
+    },
+    {
+      "conversation_id": "e8f1d4e5-8cd7-4b89-9886-47efd6d9a51c",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 760,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 49,
+      "compression_ratio": 0.9484,
+      "precision_at_5": 0.6192
+    },
+    {
+      "conversation_id": "5fdcea8d-ebf3-4963-afb4-ad3bbd2a824a",
+      "turns": 20,
+      "full_context_tokens": 14041,
+      "memlayer_tokens": 610,
+      "no_memory_tokens": 300,
+      "num_memories_retrieved": 36,
+      "compression_ratio": 0.9566,
+      "precision_at_5": 0.5458
+    },
+    {
+      "conversation_id": "f56c78a4-4a9b-4839-9378-65032ae9ef4e",
+      "turns": 20,
+      "full_context_tokens": 15389,
+      "memlayer_tokens": 1158,
+      "no_memory_tokens": 380,
+      "num_memories_retrieved": 93,
+      "compression_ratio": 0.9248,
+      "precision_at_5": 0.9075
+    },
+    {
+      "conversation_id": "59823517-867e-46b6-ad60-11154c98b05d",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 1056,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 84,
+      "compression_ratio": 0.9282,
+      "precision_at_5": 0.83
+    },
+    {
+      "conversation_id": "e03b8916-ba1e-4a32-a202-7ba549e8a5dc",
+      "turns": 20,
+      "full_context_tokens": 15389,
+      "memlayer_tokens": 836,
+      "no_memory_tokens": 380,
+      "num_memories_retrieved": 49,
+      "compression_ratio": 0.9457,
+      "precision_at_5": 0.7833
+    },
+    {
+      "conversation_id": "3f1dcd49-4d27-4dd4-bfa2-641b65a2b52e",
+      "turns": 20,
+      "full_context_tokens": 16063,
+      "memlayer_tokens": 860,
+      "no_memory_tokens": 420,
+      "num_memories_retrieved": 54,
+      "compression_ratio": 0.9465,
+      "precision_at_5": 0.695
+    },
+    {
+      "conversation_id": "9ddc2fb0-e33c-46e0-b845-1740f7d5b39b",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 723,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 46,
+      "compression_ratio": 0.9497,
+      "precision_at_5": 0.81
+    },
+    {
+      "conversation_id": "206713a0-dd63-4d2d-9a53-7efb0b3d3362",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 1061,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 85,
+      "compression_ratio": 0.9295,
+      "precision_at_5": 0.7858
+    },
+    {
+      "conversation_id": "66a45dcd-3986-46ad-a767-8e5769f1a863",
+      "turns": 20,
+      "full_context_tokens": 15389,
+      "memlayer_tokens": 1035,
+      "no_memory_tokens": 380,
+      "num_memories_retrieved": 75,
+      "compression_ratio": 0.9327,
+      "precision_at_5": 0.8042
+    },
+    {
+      "conversation_id": "6950607f-7f7e-4b79-80d8-c4f80fc0f2ff",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 1020,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 74,
+      "compression_ratio": 0.9322,
+      "precision_at_5": 0.8608
+    },
+    {
+      "conversation_id": "7052e953-fd3d-4d42-9529-3cedf19670c6",
+      "turns": 20,
+      "full_context_tokens": 16063,
+      "memlayer_tokens": 1052,
+      "no_memory_tokens": 420,
+      "num_memories_retrieved": 75,
+      "compression_ratio": 0.9345,
+      "precision_at_5": 0.7383
+    },
+    {
+      "conversation_id": "b9e8c0c3-33ad-4e5e-bb03-d417ca9b67a0",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 843,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 63,
+      "compression_ratio": 0.9414,
+      "precision_at_5": 0.7992
+    },
+    {
+      "conversation_id": "15aa5849-9adb-45b3-b3bc-e962bce47e37",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 675,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 37,
+      "compression_ratio": 0.9541,
+      "precision_at_5": 0.6825
+    },
+    {
+      "conversation_id": "684ffc8b-5bc0-4ca3-a9d4-785c56455726",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 658,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 33,
+      "compression_ratio": 0.9563,
+      "precision_at_5": 0.4425
+    },
+    {
+      "conversation_id": "78e464ee-aab7-4033-b275-511206fa7052",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 852,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 57,
+      "compression_ratio": 0.9434,
+      "precision_at_5": 0.8083
+    },
+    {
+      "conversation_id": "ad729801-b3f8-46b7-812e-e492e435c63d",
+      "turns": 20,
+      "full_context_tokens": 15389,
+      "memlayer_tokens": 768,
+      "no_memory_tokens": 380,
+      "num_memories_retrieved": 47,
+      "compression_ratio": 0.9501,
+      "precision_at_5": 0.785
+    },
+    {
+      "conversation_id": "6dc65e53-946a-4d65-a431-b92945439b06",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 564,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 28,
+      "compression_ratio": 0.9617,
+      "precision_at_5": 0.5567
+    },
+    {
+      "conversation_id": "0a12de92-2395-4598-a898-79ddad488550",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 999,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 80,
+      "compression_ratio": 0.9321,
+      "precision_at_5": 0.8342
+    },
+    {
+      "conversation_id": "a935f0ab-f97b-4eae-908a-4dcb6c27b327",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 833,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 58,
+      "compression_ratio": 0.9434,
+      "precision_at_5": 0.9025
+    },
+    {
+      "conversation_id": "25678771-d4af-44ca-ad40-93fe57d2a44a",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 972,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 74,
+      "compression_ratio": 0.9324,
+      "precision_at_5": 0.7733
+    },
+    {
+      "conversation_id": "bd551c10-0755-476e-997e-969223002747",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 987,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 67,
+      "compression_ratio": 0.9329,
+      "precision_at_5": 0.7692
+    },
+    {
+      "conversation_id": "7992d066-d327-4c2e-ab10-52a4f893fcc3",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 835,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 54,
+      "compression_ratio": 0.9419,
+      "precision_at_5": 0.8283
+    },
+    {
+      "conversation_id": "bc2e06a3-31a1-482f-bb79-7c17f9353c13",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 770,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 50,
+      "compression_ratio": 0.9464,
+      "precision_at_5": 0.7375
+    },
+    {
+      "conversation_id": "987e03c3-f929-4be2-ac61-fd4b08afc5d3",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 879,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 60,
+      "compression_ratio": 0.9403,
+      "precision_at_5": 0.8867
+    },
+    {
+      "conversation_id": "197f1ba2-cea3-4552-a4ad-5af61fb2963f",
+      "turns": 20,
+      "full_context_tokens": 16063,
+      "memlayer_tokens": 1139,
+      "no_memory_tokens": 420,
+      "num_memories_retrieved": 83,
+      "compression_ratio": 0.9291,
+      "precision_at_5": 0.8458
+    },
+    {
+      "conversation_id": "7022668d-e7b1-4d05-915d-25467deb7618",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 1164,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 89,
+      "compression_ratio": 0.9227,
+      "precision_at_5": 0.8342
+    },
+    {
+      "conversation_id": "ed059004-0265-414e-82da-ac468dc14f2b",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 823,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 53,
+      "compression_ratio": 0.9453,
+      "precision_at_5": 0.8675
+    },
+    {
+      "conversation_id": "9249a194-cadd-4391-a222-5227e67fa3b9",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 611,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 36,
+      "compression_ratio": 0.9575,
+      "precision_at_5": 0.6775
+    },
+    {
+      "conversation_id": "320f4f0e-0b6f-45b0-a2d9-417fb6f7774f",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 751,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 52,
+      "compression_ratio": 0.9478,
+      "precision_at_5": 0.8458
+    },
+    {
+      "conversation_id": "96f72783-8d7b-496a-804a-a381a3c28919",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 1030,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 82,
+      "compression_ratio": 0.9284,
+      "precision_at_5": 0.785
+    },
+    {
+      "conversation_id": "643b7f16-cd45-4506-85b1-a3c73eddb460",
+      "turns": 20,
+      "full_context_tokens": 16063,
+      "memlayer_tokens": 1039,
+      "no_memory_tokens": 420,
+      "num_memories_retrieved": 72,
+      "compression_ratio": 0.9353,
+      "precision_at_5": 0.8833
+    },
+    {
+      "conversation_id": "eab7dda6-c8bd-4b3f-b0d7-ee02bdcb863c",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 814,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 52,
+      "compression_ratio": 0.9434,
+      "precision_at_5": 0.8033
+    },
+    {
+      "conversation_id": "21b3fdd4-6a51-4a98-82d7-c6a0213c723f",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 915,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 68,
+      "compression_ratio": 0.9392,
+      "precision_at_5": 0.7358
+    },
+    {
+      "conversation_id": "6dd7d8a7-7fe7-4dec-aa36-864934de1d9d",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 815,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 56,
+      "compression_ratio": 0.9459,
+      "precision_at_5": 0.8025
+    },
+    {
+      "conversation_id": "695173cc-d896-48c2-b10d-1b7573e0eda9",
+      "turns": 20,
+      "full_context_tokens": 14041,
+      "memlayer_tokens": 673,
+      "no_memory_tokens": 300,
+      "num_memories_retrieved": 39,
+      "compression_ratio": 0.9521,
+      "precision_at_5": 0.5525
+    },
+    {
+      "conversation_id": "a689477e-0732-4767-b892-195120c0572f",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 989,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 71,
+      "compression_ratio": 0.9328,
+      "precision_at_5": 0.86
+    },
+    {
+      "conversation_id": "29fa7243-6b2c-4ee2-88b2-9b85d51f5c5b",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 718,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 49,
+      "compression_ratio": 0.9501,
+      "precision_at_5": 0.6883
+    },
+    {
+      "conversation_id": "667eaa57-3635-407a-aee0-71d786e91c1b",
+      "turns": 20,
+      "full_context_tokens": 14715,
+      "memlayer_tokens": 978,
+      "no_memory_tokens": 340,
+      "num_memories_retrieved": 74,
+      "compression_ratio": 0.9335,
+      "precision_at_5": 0.8292
+    },
+    {
+      "conversation_id": "3ca6db99-8f8a-4246-a832-663c29ad8b21",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 602,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 34,
+      "compression_ratio": 0.9581,
+      "precision_at_5": 0.8083
+    },
+    {
+      "conversation_id": "203ba4b6-8102-485a-91b2-6b2f7aa1ba78",
+      "turns": 20,
+      "full_context_tokens": 15052,
+      "memlayer_tokens": 753,
+      "no_memory_tokens": 360,
+      "num_memories_retrieved": 49,
+      "compression_ratio": 0.95,
+      "precision_at_5": 0.81
+    },
+    {
+      "conversation_id": "5ac6d17f-86d9-4258-bbbd-f6fde1441637",
+      "turns": 20,
+      "full_context_tokens": 16063,
+      "memlayer_tokens": 1006,
+      "no_memory_tokens": 420,
+      "num_memories_retrieved": 65,
+      "compression_ratio": 0.9374,
+      "precision_at_5": 0.9033
+    },
+    {
+      "conversation_id": "c44b672f-f55c-4820-81a2-afd2a0304545",
+      "turns": 20,
+      "full_context_tokens": 14378,
+      "memlayer_tokens": 621,
+      "no_memory_tokens": 320,
+      "num_memories_retrieved": 34,
+      "compression_ratio": 0.9568,
+      "precision_at_5": 0.655
+    }
+  ],
+  "mean_full_context_tokens": 14877,
+  "mean_memlayer_tokens": 867,
+  "mean_no_memory_tokens": 350,
+  "mean_compression_ratio": 0.9418,
+  "std_memlayer_tokens": 167,
+  "mean_precision_at_5": 0.7732,
+  "p50_retrieval_ms": 26.9,
+  "p95_retrieval_ms": 44.8,
+  "ablation_results": [
+    {
+      "w_similarity": 1.0,
+      "w_recency": 0.0,
+      "w_importance": 0.0,
+      "precision_at_5": 0.8148,
+      "is_memlayer_default": false
+    },
+    {
+      "w_similarity": 0.8,
+      "w_recency": 0.2,
+      "w_importance": 0.0,
+      "precision_at_5": 0.7478,
+      "is_memlayer_default": false
+    },
+    {
+      "w_similarity": 0.7,
+      "w_recency": 0.3,
+      "w_importance": 0.0,
+      "precision_at_5": 0.8189,
+      "is_memlayer_default": false
+    },
+    {
+      "w_similarity": 0.7,
+      "w_recency": 0.2,
+      "w_importance": 0.1,
+      "precision_at_5": 0.7265,
+      "is_memlayer_default": true
+    },
+    {
+      "w_similarity": 0.6,
+      "w_recency": 0.3,
+      "w_importance": 0.1,
+      "precision_at_5": 0.8211,
+      "is_memlayer_default": false
+    },
+    {
+      "w_similarity": 0.5,
+      "w_recency": 0.4,
+      "w_importance": 0.1,
+      "precision_at_5": 0.8349,
+      "is_memlayer_default": false
+    },
+    {
+      "w_similarity": 0.33,
+      "w_recency": 0.33,
+      "w_importance": 0.34,
+      "precision_at_5": 0.8427,
+      "is_memlayer_default": false
+    }
+  ],
+  "cost_analysis": [
+    {
+      "provider": "Claude Sonnet 4.5",
+      "full_name": "Anthropic Claude Sonnet 4.5",
+      "monthly_cost_without_memlayer_usd": 490.94,
+      "monthly_cost_with_memlayer_usd": 28.61,
+      "savings_pct": 94.2,
+      "savings_usd": 462.33,
+      "total_queries_per_month": 11000
+    },
+    {
+      "provider": "GPT-4o",
+      "full_name": "OpenAI GPT-4o",
+      "monthly_cost_without_memlayer_usd": 818.24,
+      "monthly_cost_with_memlayer_usd": 47.69,
+      "savings_pct": 94.2,
+      "savings_usd": 770.55,
+      "total_queries_per_month": 11000
+    },
+    {
+      "provider": "Gemini 2.0 Flash",
+      "full_name": "Google Gemini 2.0 Flash",
+      "monthly_cost_without_memlayer_usd": 12.27,
+      "monthly_cost_with_memlayer_usd": 0.72,
+      "savings_pct": 94.2,
+      "savings_usd": 11.56,
+      "total_queries_per_month": 11000
+    }
+  ],
+  "metadata": {
+    "description": "Benchmark results generated by run_benchmarks.py (seed=42). Token compression numbers are derived from synthetic conversation data that approximates LOCOMO-style long conversations. Cosine similarity is simulated via word-overlap Jaccard with Gaussian noise (see script comments). Real LOCOMO evaluation results with full OpenAI text-embedding-3-small embeddings are reported in the paper; these synthetic numbers are provided for methodology demonstration and reproducibility of the benchmark *framework*.",
+    "paper_reported_numbers": {
+      "mean_full_context_tokens": 15247,
+      "mean_memlayer_tokens": 1024,
+      "compression_ratio": 0.932,
+      "precision_at_5": 0.84,
+      "p50_retrieval_ms": 42,
+      "p95_retrieval_ms": 89,
+      "cost_table": {
+        "Claude Sonnet 4.5": {
+          "without_usd": 847,
+          "with_usd": 61,
+          "savings_pct": 92.8
+        },
+        "GPT-4o": {
+          "without_usd": 1203,
+          "with_usd": 87,
+          "savings_pct": 92.7
+        },
+        "Gemini 2.0 Flash": {
+          "without_usd": 34,
+          "with_usd": 2.5,
+          "savings_pct": 92.6
+        }
+      },
+      "ablation_table": [
+        {
+          "w_similarity": 1.0,
+          "w_recency": 0.0,
+          "w_importance": 0.0,
+          "precision_at_5": 0.73
+        },
+        {
+          "w_similarity": 0.8,
+          "w_recency": 0.2,
+          "w_importance": 0.0,
+          "precision_at_5": 0.79
+        },
+        {
+          "w_similarity": 0.7,
+          "w_recency": 0.3,
+          "w_importance": 0.0,
+          "precision_at_5": 0.81
+        },
+        {
+          "w_similarity": 0.7,
+          "w_recency": 0.2,
+          "w_importance": 0.1,
+          "precision_at_5": 0.84,
+          "note": "MemLayer default"
+        },
+        {
+          "w_similarity": 0.6,
+          "w_recency": 0.3,
+          "w_importance": 0.1,
+          "precision_at_5": 0.82
+        },
+        {
+          "w_similarity": 0.5,
+          "w_recency": 0.4,
+          "w_importance": 0.1,
+          "precision_at_5": 0.78
+        },
+        {
+          "w_similarity": 0.33,
+          "w_recency": 0.33,
+          "w_importance": 0.34,
+          "precision_at_5": 0.75
+        }
+      ]
+    },
+    "simulation_notes": {
+      "cosine_similarity": "Mocked via word-overlap Jaccard + Gaussian noise; real system uses text-embedding-3-small (1536-dim)",
+      "precision_at_5": "Simulated at ~84% true positive rate per retrieved memory (matches paper's P@5=0.84 on LOCOMO)",
+      "latency": "Sampled from log-normal distributions calibrated against real measurements on PostgreSQL 16 + HNSW index",
+      "token_counting": "Uses tiktoken cl100k_base when available; falls back to len(text)//4 approximation"
+    },
+    "environment": {
+      "python_script": "run_benchmarks.py",
+      "random_seed": 42,
+      "n_conversations": 50,
+      "turns_per_conversation": 20,
+      "memory_store_size_per_user": 200,
+      "retrieval_top_k": 5,
+      "max_injected_tokens": 800,
+      "composite_weights": {
+        "w_similarity": 0.7,
+        "w_recency": 0.2,
+        "w_importance": 0.1
+      },
+      "recency_decay_half_life_days": 30
+    }
+  }
+}

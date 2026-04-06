@@ -44,11 +44,24 @@ class Settings(BaseSettings):
     local_embedding_model: str = "all-MiniLM-L6-v2"
     local_embedding_dimensions: int = 384
 
+    # Anthropic
+    anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
+
+    # Google
+    google_api_key: Optional[str] = Field(default=None, alias="GOOGLE_API_KEY")
+
     # Memory pipeline
     max_chunk_size: int = 512  # tokens
     chunk_overlap: int = 50
     max_context_memories: int = 5
-    similarity_threshold: float = 0.7
+    similarity_threshold: float = 0.65
+
+    # Economics / analytics
+    # Conservative estimate of full conversation history tokens when user has no explicit baseline.
+    # Used to calculate tokens_saved = full_context_baseline_tokens - augmented_tokens.
+    full_context_baseline_tokens: int = Field(
+        default=15_000, alias="FULL_CONTEXT_BASELINE_TOKENS"
+    )
 
     # Celery
     celery_broker_url: str = Field(

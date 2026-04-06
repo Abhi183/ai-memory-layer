@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api, Memory, MemorySearchResult, MemoryType } from "@/lib/api";
 import MemoryCard from "./MemoryCard";
+import AnalyticsDashboard from "@/components/analytics/AnalyticsDashboard";
 
 interface Props {
   onLogout: () => void;
@@ -26,7 +27,7 @@ export default function MemoryDashboard({ onLogout }: Props) {
   const [searching, setSearching] = useState(false);
   const [contextPrompt, setContextPrompt] = useState("");
   const [contextResult, setContextResult] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"memories" | "search" | "context">("memories");
+  const [activeTab, setActiveTab] = useState<"memories" | "search" | "context" | "analytics">("memories");
 
   const loadMemories = useCallback(async () => {
     setLoading(true);
@@ -114,8 +115,8 @@ export default function MemoryDashboard({ onLogout }: Props) {
 
       <div className="max-w-5xl mx-auto px-4 py-6 w-full flex-1">
         {/* Tab bar */}
-        <div className="flex gap-1 bg-slate-900 p-1 rounded-lg mb-6 w-fit">
-          {(["memories", "search", "context"] as const).map((tab) => (
+        <div className="flex gap-1 bg-slate-900 p-1 rounded-lg mb-6 w-fit flex-wrap">
+          {(["memories", "search", "context", "analytics"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -123,7 +124,7 @@ export default function MemoryDashboard({ onLogout }: Props) {
                 activeTab === tab ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
               }`}
             >
-              {tab}
+              {tab === "analytics" ? "📊 Analytics" : tab}
             </button>
           ))}
         </div>
@@ -229,6 +230,11 @@ export default function MemoryDashboard({ onLogout }: Props) {
               )
             )}
           </>
+        )}
+
+        {/* ── Analytics tab ── */}
+        {activeTab === "analytics" && (
+          <AnalyticsDashboard />
         )}
 
         {/* ── Context tab ── */}
