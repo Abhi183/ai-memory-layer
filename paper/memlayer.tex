@@ -378,11 +378,12 @@ The Token Compression Ratio is:
 \paragraph{Break-even analysis.}
 The three pipeline steps consume approximately 6{,}200 input tokens and
 305 output tokens per memory:
-\begin{equation}
-  C_{\text{ingestion}} = \frac{6{,}200 \times 0.15 + 305 \times 0.60}{10^6}
-      \approx \$0.00113 \text{ per memory}
+\begin{align}
+  C_{\text{ingestion}} &= \frac{6{,}200 \times 0.15 + 305 \times 0.60}{10^6}
+      \nonumber \\
+      &\approx \$0.00113 \text{ per memory}
   \label{eq:ingestion_cost_example}
-\end{equation}
+\end{align}
 A single retrieval under the baseline assumptions
 ($T_{\text{full}} = 15{,}000$, $T_{\text{aug}} = 1{,}000$, Claude
 Sonnet~4.5 at \$3.00/million) saves:
@@ -481,11 +482,11 @@ is worse than injecting no context at all.
 MemLayer addresses this with two complementary invalidation paths.
 
 \paragraph{Implicit pipeline invalidation.}
-The GPT-4o-mini fact extraction step now returns an additional JSON field:
-\begin{verbatim}
-{"facts": [...],
- "invalidates_previous_fact": ["<old state description>"]}
-\end{verbatim}
+The GPT-4o-mini fact extraction step now returns an additional JSON field
+\texttt{invalidates\_previous\_fact}: a list of short strings describing
+facts that the current turn has superseded, e.g.:\vspace{2pt}
+
+\noindent\texttt{\small \{"facts":[...], "invalidates\_previous\_fact":["<old state>"]\}}
 If the LLM detects a contradiction (e.g., ``User has switched from React to
 Vue''), the pipeline performs a full-text search over active memories for the
 old fact description and sets their status to \textsc{Inactive}, excluding
@@ -596,14 +597,14 @@ implementation used in production.}
 \label{tab:compression}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
-\begin{tabular}{@{}lrrrl@{}}
+\begin{tabular}{@{}lrrl@{}}
 \toprule
-Method & Tokens/Query & Std & TCR & Source \\
+Method & Tokens & TCR & Ref. \\
 \midrule
-Full-Context          & 14,877 & 1,621 & 0.000 & Measured \\
-No-Memory             & 350    & 47    & 0.977 & Measured \\
-Mem0                  & $\sim$1,500 & --- & 0.900 & \citet{chhikara2025mem0} \\
-\textbf{MemLayer (ours)} & \textbf{867} & \textbf{167} & \textbf{0.942} & \textbf{Measured} \\
+Full-Context             & 14,877 & 0.000 & Measured \\
+No-Memory                & 350    & 0.977 & Measured \\
+Mem0                     & $\sim$1,500 & 0.900 & \citealt{chhikara2025mem0} \\
+\textbf{MemLayer (ours)} & \textbf{867\,$\pm$\,167} & \textbf{0.942} & \textbf{Measured} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -729,12 +730,12 @@ Provider prices are as of April 2026.}
 \setlength{\tabcolsep}{3pt}
 \begin{tabular}{@{}llrrr@{}}
 \toprule
-Provider & Model & w/o MemLayer & w/ MemLayer & Savings \\
+Provider & Model & Without & With & Savings \\
 \midrule
-Anthropic & Sonnet~4.5       & \$490.94 & \$28.61 & 94.2\% \\
-OpenAI    & GPT-4o           & \$409.12 & \$23.84 & 94.2\% \\
-Google    & Gemini~2.0 Flash & \$16.36  & \$0.95  & 94.2\% \\
-Local     & Ollama (llama3)  & \$0      & \$0     & ---    \\
+Anthropic & Sonnet 4.5     & \$490.94 & \$28.61 & 94.2\% \\
+OpenAI    & GPT-4o         & \$409.12 & \$23.84 & 94.2\% \\
+Google    & Gemini 2.0 Fl. & \$16.36  & \$0.95  & 94.2\% \\
+Local     & Ollama llama3  & \$0      & \$0     & ---    \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -801,7 +802,7 @@ Under 100 stress-test queries (results in
   \item \textbf{Embedding}: p50\,=\,0.67~ms, p95\,=\,0.79~ms
   \item \textbf{HNSW search}: p50\,=\,0.01~ms, p95\,=\,0.79~ms
   \item \textbf{Re-ranking}: p50\,=\,0.01~ms, p95\,=\,0.79~ms
-  \item \textbf{End-to-end}: p50\,=\,0.69~ms, p95\,=\,0.79~ms, p99\,=\,0.94~ms
+  \item \textbf{End-to-end}: p50\,=\,0.69~ms, p95\,=\,0.79~ms
 \end{itemize}
 These times will increase with corpus size; published FAISS benchmarks report
 1--5~ms at $n{=}100{,}000$ vectors on commodity hardware~\citep{johnson2019billion}.
@@ -811,22 +812,22 @@ depending on API load.
 
 \begin{table}[t]
 \centering
-\caption{Measured end-to-end retrieval latency (100 queries, 45-memory corpus,
-all-MiniLM-L6-v2, Docker container). API-path embedding latency is from
-OpenAI documentation; all other values are directly measured.}
+\caption{Retrieval pipeline latency (100 stress-test queries, 45-memory
+corpus, \texttt{all-MiniLM-L6-v2}, Docker container).
+API-path embedding from OpenAI documentation; all other values measured.}
 \label{tab:latency}
 \footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lrrrrl@{}}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lrrl@{}}
 \toprule
-Component & p50 & p95 & p99 & Total (p50) & Source \\
+Component & p50 & p95 & Source \\
 \midrule
-Embedding (local)     & 0.67~ms & 0.79~ms & --- & ---      & Measured \\
-HNSW search           & 0.01~ms & 0.79~ms & --- & ---      & Measured \\
-Re-ranking            & 0.01~ms & 0.79~ms & --- & ---      & Measured \\
+Local embedding      & 0.67~ms & 0.79~ms & Measured \\
+HNSW search          & 0.01~ms & 0.01~ms & Measured \\
+Re-ranking           & 0.01~ms & 0.01~ms & Measured \\
 \midrule
-\textbf{End-to-end (local)}  & \textbf{0.69~ms} & \textbf{0.79~ms} & \textbf{0.94~ms} & \textbf{0.69~ms} & Measured \\
-End-to-end (API path) & 50~ms & 200~ms & --- & 50--200~ms & OpenAI docs \\
+\textbf{End-to-end (local)} & \textbf{0.69~ms} & \textbf{0.79~ms} & Measured \\
+End-to-end (API)     & $\sim$50~ms & $\sim$200~ms & OpenAI docs \\
 \bottomrule
 \end{tabular}
 \end{table}
