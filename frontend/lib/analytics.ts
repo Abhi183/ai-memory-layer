@@ -23,6 +23,21 @@ export interface AnalyticsSummary {
   avg_original_tokens: number;
   avg_memory_tokens: number;
   cost_per_million_tokens: number;
+  // Full ROI fields
+  total_retrieval_savings_usd: number;
+  total_ingestion_cost_usd: number;
+  net_savings_usd: number;
+  break_even_retrievals: number;
+}
+
+export interface ROISummary {
+  total_retrieval_savings_usd: number;
+  total_ingestion_cost_usd: number;
+  net_savings_usd: number;
+  /** Average retrievals per memory needed to cover ingestion cost. <1.0 = pays on first hit. */
+  break_even_retrievals: number;
+  ingestion_model: string;
+  days: number;
 }
 
 export interface TimelinePoint {
@@ -64,8 +79,14 @@ export const MOCK_SUMMARY: AnalyticsSummary = {
   avg_original_tokens: 0,
   avg_memory_tokens: 0,
   cost_per_million_tokens: 3.0,
+  total_retrieval_savings_usd: 0,
+  total_ingestion_cost_usd: 0,
+  net_savings_usd: 0,
+  break_even_retrievals: 0,
 };
 
+// Demo ingestion cost: 2847 queries × $0.00113 per memory ingestion ≈ $3.22
+// (conservative: not every query captures a new memory, assume ~1 new memory per query on average)
 export const DEMO_SUMMARY: AnalyticsSummary = {
   total_cost_saved_usd: 47.83,
   total_tokens_saved: 15_943_200,
@@ -81,6 +102,10 @@ export const DEMO_SUMMARY: AnalyticsSummary = {
   avg_original_tokens: 14_800,
   avg_memory_tokens: 1_762,
   cost_per_million_tokens: 3.0,
+  total_retrieval_savings_usd: 47.83,
+  total_ingestion_cost_usd: 3.22,
+  net_savings_usd: 44.61,
+  break_even_retrievals: 0.027,
 };
 
 export const DEMO_TIMELINE: TimelinePoint[] = Array.from({ length: 30 }, (_, i) => {
@@ -168,6 +193,10 @@ export async function getAnalyticsTimeline(days = 30): Promise<TimelinePoint[]> 
 
 export async function getProviderBreakdown(): Promise<ProviderStat[]> {
   return fetchAnalytics<ProviderStat[]>("/analytics/providers");
+}
+
+export async function getROISummary(days = 30): Promise<ROISummary> {
+  return fetchAnalytics<ROISummary>(`/analytics/roi?days=${days}`);
 }
 
 // ── Formatting helpers ──────────────────────────────────────────────────────

@@ -55,6 +55,33 @@ class AnalyticsSummary(BaseModel):
         description="Average time in milliseconds for memory lookup"
     )
     days: int = Field(description="Number of days covered by this summary")
+    # Full ROI fields
+    total_retrieval_savings_usd: float = Field(
+        default=0.0, description="Gross USD saved at retrieval time (same as total_savings_usd)"
+    )
+    total_ingestion_cost_usd: float = Field(
+        default=0.0, description="Total LLM API cost incurred during memory ingestion"
+    )
+    net_savings_usd: float = Field(
+        default=0.0, description="Net savings after subtracting ingestion cost"
+    )
+    break_even_retrievals: float = Field(
+        default=0.0,
+        description=(
+            "Average number of retrievals needed for a memory to cover its ingestion cost. "
+            "Values below 1.0 mean even a single retrieval more than pays for ingestion."
+        ),
+    )
+
+
+class ROISummary(BaseModel):
+    """Dedicated ROI breakdown returned by GET /analytics/roi."""
+    total_retrieval_savings_usd: float
+    total_ingestion_cost_usd: float
+    net_savings_usd: float
+    break_even_retrievals: float
+    ingestion_model: str
+    days: int
 
 
 class AnalyticsTimeline(BaseModel):

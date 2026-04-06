@@ -8,3 +8,5 @@ tiktoken>=0.7.0
 google-generativeai>=0.7.0
 mcp>=1.0.0
 anyio>=4.4.0
+keyring>=25.2.1
+argon2-cffi>=23.1.0

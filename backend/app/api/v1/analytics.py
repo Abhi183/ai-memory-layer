@@ -11,6 +11,7 @@ from app.schemas.analytics import (
     AnalyticsSummary,
     AnalyticsTimeline,
     ProviderBreakdown,
+    ROISummary,
 )
 from app.services.analytics_service import analytics_service
 from sqlalchemy import select, and_
@@ -57,6 +58,38 @@ async def get_provider_breakdown(
     ordered by total savings descending.
     """
     return await analytics_service.get_provider_breakdown(db, user.id)
+
+
+@router.get("/roi", response_model=ROISummary)
+async def get_roi(
+    days: int = Query(default=30, ge=1, le=365, description="Lookback window in days"),
+    ingestion_model: str = Query(
+        default="gpt-4o-mini",
+        description="Model used for ingestion pipeline cost calculations",
+    ),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Return a full ROI breakdown separating gross retrieval savings from ingestion costs.
+
+    Example response:
+    ```json
+    {
+      "total_retrieval_savings_usd": 12.45,
+      "total_ingestion_cost_usd": 1.23,
+      "net_savings_usd": 11.22,
+      "break_even_retrievals": 3.2,
+      "ingestion_model": "gpt-4o-mini",
+      "days": 30
+    }
+    ```
+
+    `break_even_retrievals` is the average number of times a memory must be retrieved
+    to cover its ingestion cost. Values below 1.0 mean ingestion pays for itself on
+    the very first retrieval.
+    """
+    return await analytics_service.get_roi(db, user.id, days=days, ingestion_model=ingestion_model)
 
 
 @router.get("/logs", response_model=list[AnalyticsLogRead])

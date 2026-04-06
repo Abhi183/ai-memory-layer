@@ -101,6 +101,27 @@ class ContextRequest(BaseModel):
         description="Max tokens to use for injected context"
     )
     max_memories: int = Field(default=5, ge=1, le=20)
+    # MSA-inspired adaptive features
+    use_adaptive_k: bool = Field(
+        default=True,
+        description=(
+            "When True, use adaptive top-k selection based on score gaps rather than "
+            "a fixed k. Mirrors MSA's routing: inject only the tight relevant cluster."
+        ),
+    )
+    use_multi_hop: bool = Field(
+        default=False,
+        description=(
+            "When True, run a second retrieval hop using hop-1 summaries as queries "
+            "to surface bridging memories (MSA Memory Interleave style)."
+        ),
+    )
+    multi_hop_depth: int = Field(
+        default=2,
+        ge=1,
+        le=4,
+        description="Number of retrieval hops when use_multi_hop is True.",
+    )
 
 
 class ContextResponse(BaseModel):
@@ -108,3 +129,46 @@ class ContextResponse(BaseModel):
     augmented_prompt: str
     injected_memories: list[MemorySearchResult]
     context_tokens_used: int
+
+
+# ── Context Explain (debug) ────────────────────────────────────────────────────
+
+
+class MemoryScoreBreakdown(BaseModel):
+    """Per-memory score components for the /context/explain endpoint."""
+    memory_id: uuid.UUID
+    summary_snippet: str = Field(description="First 120 chars of the memory summary or content")
+    cosine_score: float = Field(description="Raw cosine similarity from pgvector (0–1)")
+    recency_score: float = Field(description="Exponential-decay recency component (0–1)")
+    importance_score: float = Field(description="Stored importance_score field (0–1)")
+    composite_score: float = Field(
+        description="Weighted composite: 0.7*cosine + 0.2*recency + 0.1*importance"
+    )
+    hop: int = Field(
+        default=1,
+        description="Which retrieval hop surfaced this memory (1 = direct, 2 = bridging).",
+    )
+
+
+class ContextExplainResponse(BaseModel):
+    """
+    Debug view of what the context endpoint decided and why.
+    Useful for users tuning their memory store or integration behaviour.
+    """
+    original_prompt: str
+    # Score breakdown for every candidate memory (before k-cutoff)
+    candidate_scores: list[MemoryScoreBreakdown]
+    # The memories that were actually injected
+    injected_memories: list[MemorySearchResult]
+    # Adaptive-k diagnostics
+    adaptive_k_used: bool
+    adaptive_k_chosen: Optional[int] = Field(
+        default=None,
+        description="The k value adaptive_k() selected, or None if adaptive-k was off.",
+    )
+    # Multi-hop diagnostics
+    multi_hop_used: bool
+    hops_executed: int
+    # Token accounting
+    context_tokens_used: int
+    augmented_prompt: str

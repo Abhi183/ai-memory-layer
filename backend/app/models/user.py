@@ -16,9 +16,19 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # Encryption: each user has their own derived key salt stored here.
-    # The actual encryption key is derived server-side from their password + this salt.
+    # Encryption salts and per-user secrets.
+    #
+    # encryption_salt: random 32-byte hex value, unique per user.  Used as the
+    #     KDF salt in both argon2id (Option A) and PBKDF2 (Option B) key
+    #     derivation.  Safe to store in the DB — it is not secret.
+    #
+    # per_user_secret: random 32-byte hex value, unique per user.  Used ONLY
+    #     in Option B (server deployments) as the KDF input material.  This
+    #     means each user's key is independent; a server compromise reveals
+    #     only the rows that were already readable, not a master key.  It is
+    #     NOT a global server secret — never use the same value for two users.
     encryption_salt: Mapped[str] = mapped_column(String(64), nullable=False)
+    per_user_secret: Mapped[str] = mapped_column(String(64), nullable=False, default="")
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, Zap, Layers, Target, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { DollarSign, Zap, Layers, Target, TrendingUp, TrendingDown, Minus, BadgeDollarSign } from "lucide-react";
 import { AnalyticsSummary, formatUsd, formatTokens, formatPct } from "@/lib/analytics";
 
 interface Props {
@@ -16,6 +16,7 @@ interface StatCardProps {
   accentClass: string;
   bgClass: string;
   borderClass: string;
+  subLine?: string;
 }
 
 function TrendBadge({ pct }: { pct: number }) {
@@ -45,7 +46,7 @@ function TrendBadge({ pct }: { pct: number }) {
   );
 }
 
-function StatCard({ label, value, trend, icon, accentClass, bgClass, borderClass }: StatCardProps) {
+function StatCard({ label, value, trend, icon, accentClass, bgClass, borderClass, subLine }: StatCardProps) {
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border ${borderClass} ${bgClass} p-5 flex flex-col gap-3`}
@@ -65,6 +66,9 @@ function StatCard({ label, value, trend, icon, accentClass, bgClass, borderClass
       <div>
         <p className="text-3xl font-bold text-white tracking-tight leading-none">{value}</p>
         <p className="text-xs text-slate-400 mt-1.5 font-medium uppercase tracking-wider">{label}</p>
+        {subLine && (
+          <p className="text-xs text-slate-500 mt-1">{subLine}</p>
+        )}
       </div>
 
       <p className="text-xs text-slate-500">vs last period</p>
@@ -73,15 +77,34 @@ function StatCard({ label, value, trend, icon, accentClass, bgClass, borderClass
 }
 
 export default function EconomicsOverview({ summary, isDemo }: Props) {
+  const hasIngestionData = summary.total_ingestion_cost_usd > 0 || summary.total_retrieval_savings_usd > 0;
+
   const stats: StatCardProps[] = [
     {
-      label: "Total Cost Saved",
-      value: formatUsd(summary.total_cost_saved_usd),
+      label: "Gross Retrieval Savings",
+      value: formatUsd(summary.total_retrieval_savings_usd ?? summary.total_cost_saved_usd),
       trend: summary.cost_saved_trend_pct,
       icon: <DollarSign className="w-5 h-5 text-emerald-400" />,
       accentClass: "bg-emerald-500",
       bgClass: "bg-gradient-to-br from-slate-900 to-emerald-950/30",
       borderClass: "border-emerald-900/60",
+      subLine: hasIngestionData
+        ? `Ingestion cost: ${formatUsd(summary.total_ingestion_cost_usd)}`
+        : undefined,
+    },
+    {
+      label: "Net Savings",
+      value: hasIngestionData ? formatUsd(summary.net_savings_usd) : "—",
+      trend: summary.cost_saved_trend_pct,
+      icon: <BadgeDollarSign className="w-5 h-5 text-teal-400" />,
+      accentClass: "bg-teal-500",
+      bgClass: "bg-gradient-to-br from-slate-900 to-teal-950/30",
+      borderClass: "border-teal-900/60",
+      subLine: hasIngestionData && summary.break_even_retrievals > 0
+        ? `Break-even: ${summary.break_even_retrievals < 1
+            ? `<1 retrieval`
+            : `${summary.break_even_retrievals.toFixed(1)} retrievals`}`
+        : undefined,
     },
     {
       label: "Tokens Saved",
@@ -128,7 +151,7 @@ export default function EconomicsOverview({ summary, isDemo }: Props) {
           </span>
         </div>
       )}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {stats.map((s) => (
           <StatCard key={s.label} {...s} />
         ))}

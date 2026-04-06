@@ -30,6 +30,11 @@ class AnalyticsLog(Base):
     tokens_saved: Mapped[int] = mapped_column(Integer, nullable=False)
     cost_saved_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
+    # Ingestion cost — LLM API expense incurred when processing this memory
+    ingestion_cost_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    ingestion_input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    ingestion_output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
     # Retrieval stats
     retrieval_hit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     retrieval_latency_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

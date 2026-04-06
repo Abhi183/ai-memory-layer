@@ -3,12 +3,39 @@ Configuration management for mem-ai.
 
 Reads from ~/.mem-ai/config.json or environment variables.
 Environment variables take precedence over config file values.
+
+Master-passphrase management
+-----------------------------
+The master passphrase is used exclusively for local AES-256-GCM key derivation
+(argon2id).  It is *not* the HTTP login password used for API authentication.
+Keeping these separate means:
+  - The HTTP password can be rotated without re-encrypting stored memories.
+  - The master passphrase never travels over the network.
+
+Storage priority (highest to lowest):
+  1. OS keychain (via the ``keyring`` library) — unlocked by the user's OS
+     session; no plaintext on disk.
+  2. Environment variable ``MEM_AI_PASSPHRASE`` — for headless/CI use.
+  3. Interactive prompt — result is offered to keyring for future sessions.
 """
 
+import getpass
 import json
 import os
 from pathlib import Path
 from typing import Any
+
+# keyring is an optional dependency; degrade gracefully when absent or when
+# no keychain backend is available (e.g. headless Linux without libsecret).
+try:
+    import keyring as _keyring
+    import keyring.errors as _keyring_errors
+    _KEYRING_AVAILABLE = True
+except ImportError:
+    _KEYRING_AVAILABLE = False
+
+_KEYRING_SERVICE = "memlayer"
+_PASSPHRASE_ENV_VAR = "MEM_AI_PASSPHRASE"
 
 CONFIG_DIR = Path.home() / ".mem-ai"
 CONFIG_FILE = CONFIG_DIR / "config.json"
@@ -160,3 +187,87 @@ MEM_AI_API_URL: str = config.api_url
 MEM_AI_TOKEN: str = config.token
 MEM_AI_PLATFORM: str = config.platform
 FULL_CONTEXT_BASELINE_TOKENS: int = config.full_context_baseline_tokens
+
+
+# ---------------------------------------------------------------------------
+# Master-passphrase helpers
+# ---------------------------------------------------------------------------
+
+def get_master_passphrase(username: str) -> str | None:
+    """
+    Retrieve the master passphrase for *username*.
+
+    Lookup order
+    ------------
+    1. OS keychain (keyring) — preferred; passphrase never hits the filesystem.
+    2. Environment variable MEM_AI_PASSPHRASE — for headless/CI environments.
+    3. Returns None if nothing is found, signalling the caller to prompt.
+
+    The passphrase is the argon2id key-derivation input.  It is distinct from
+    the HTTP login password and is never sent to the MemLayer API server.
+    """
+    # 1. OS keychain
+    if _KEYRING_AVAILABLE:
+        try:
+            stored = _keyring.get_password(_KEYRING_SERVICE, username)
+            if stored:
+                return stored
+        except Exception:
+            # Keyring backend errors (e.g. locked session, no backend) are
+            # non-fatal; fall through to the env-var path.
+            pass
+
+    # 2. Environment variable
+    env_val = os.environ.get(_PASSPHRASE_ENV_VAR)
+    if env_val:
+        return env_val
+
+    return None
+
+
+def store_master_passphrase(username: str, passphrase: str) -> bool:
+    """
+    Persist *passphrase* in the OS keychain under *username*.
+
+    Returns True if storage succeeded, False if no keychain backend is
+    available (caller should warn the user to set MEM_AI_PASSPHRASE instead).
+
+    The passphrase is stored only in the OS keychain — never in
+    ~/.mem-ai/config.json or any other plaintext file.
+    """
+    if not _KEYRING_AVAILABLE:
+        return False
+    try:
+        _keyring.set_password(_KEYRING_SERVICE, username, passphrase)
+        return True
+    except Exception:
+        return False
+
+
+def prompt_and_store_passphrase(username: str) -> str:
+    """
+    Interactively prompt the user for their master passphrase, then attempt to
+    store it in the OS keychain.
+
+    Used during first-time setup and when no stored passphrase is found.
+    Returns the entered passphrase so the caller can use it immediately.
+    """
+    print(
+        "\nMemLayer encrypts your memories locally using a master passphrase.\n"
+        "This passphrase is SEPARATE from your login password and never sent\n"
+        "to any server.  Choose something strong and memorable.\n"
+    )
+    passphrase = getpass.getpass("Master passphrase: ")
+    confirm = getpass.getpass("Confirm master passphrase: ")
+    if passphrase != confirm:
+        raise ValueError("Passphrases do not match.")
+
+    stored = store_master_passphrase(username, passphrase)
+    if stored:
+        print("Passphrase saved to OS keychain.  You will not need to re-enter it.")
+    else:
+        print(
+            f"Could not save to OS keychain.  "
+            f"Set {_PASSPHRASE_ENV_VAR} in your environment to avoid re-prompting."
+        )
+    return passphrase

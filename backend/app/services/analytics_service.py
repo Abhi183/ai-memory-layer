@@ -19,6 +19,7 @@ from app.schemas.analytics import (
     AnalyticsSummary,
     AnalyticsTimeline,
     ProviderBreakdown,
+    ROISummary,
 )
 from app.services.pricing import calculate_cost_savings
 
@@ -42,6 +43,9 @@ class AnalyticsService:
         hit_count: int,
         latency_ms: int,
         request_id: Optional[uuid.UUID] = None,
+        ingestion_cost_usd: float = 0.0,
+        ingestion_input_tokens: int = 0,
+        ingestion_output_tokens: int = 0,
     ) -> AnalyticsLog:
         """
         Persist one analytics record.
@@ -68,6 +72,9 @@ class AnalyticsService:
             augmented_tokens=augmented_tokens,
             tokens_saved=tokens_saved,
             cost_saved_usd=cost_saved_usd,
+            ingestion_cost_usd=ingestion_cost_usd,
+            ingestion_input_tokens=ingestion_input_tokens,
+            ingestion_output_tokens=ingestion_output_tokens,
             retrieval_hit_count=hit_count,
             retrieval_latency_ms=latency_ms,
             compression_ratio=compression_ratio,
@@ -105,6 +112,7 @@ class AnalyticsService:
             func.count(AnalyticsLog.id).label("total_requests"),
             func.coalesce(func.avg(AnalyticsLog.compression_ratio), 1.0).label("avg_compression_ratio"),
             func.coalesce(func.avg(AnalyticsLog.retrieval_latency_ms), 0.0).label("avg_retrieval_latency_ms"),
+            func.coalesce(func.sum(AnalyticsLog.ingestion_cost_usd), 0.0).label("total_ingestion_cost_usd"),
         ).where(
             and_(
                 AnalyticsLog.user_id == user_id,
@@ -115,12 +123,81 @@ class AnalyticsService:
         result = await db.execute(stmt)
         row = result.one()
 
+        total_retrieval_savings = round(float(row.total_savings_usd), 6)
+        total_ingestion_cost = round(float(row.total_ingestion_cost_usd), 6)
+        net_savings = round(total_retrieval_savings - total_ingestion_cost, 6)
+        total_requests = int(row.total_requests)
+
+        # break-even: how many retrievals needed to cover the average ingestion cost?
+        # Uses per-request averages: avg_ingestion_cost / avg_retrieval_savings_per_request.
+        if total_requests > 0 and total_retrieval_savings > 0:
+            avg_retrieval_savings = total_retrieval_savings / total_requests
+            avg_ingestion_cost = total_ingestion_cost / total_requests
+            break_even = round(avg_ingestion_cost / avg_retrieval_savings, 4) if avg_retrieval_savings > 0 else 0.0
+        else:
+            break_even = 0.0
+
         return AnalyticsSummary(
-            total_savings_usd=round(float(row.total_savings_usd), 6),
+            total_savings_usd=total_retrieval_savings,
             total_tokens_saved=int(row.total_tokens_saved),
-            total_requests=int(row.total_requests),
+            total_requests=total_requests,
             avg_compression_ratio=round(float(row.avg_compression_ratio), 4),
             avg_retrieval_latency_ms=round(float(row.avg_retrieval_latency_ms), 2),
+            days=days,
+            total_retrieval_savings_usd=total_retrieval_savings,
+            total_ingestion_cost_usd=total_ingestion_cost,
+            net_savings_usd=net_savings,
+            break_even_retrievals=break_even,
+        )
+
+    async def get_roi(
+        self,
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        days: int = 30,
+        ingestion_model: str = "gpt-4o-mini",
+    ) -> ROISummary:
+        """
+        Return a dedicated ROI breakdown for the last `days` days.
+
+        Separates gross retrieval savings from ingestion costs so callers can
+        display the full cost equation:
+            net_savings = retrieval_savings - ingestion_cost
+        """
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+
+        stmt = select(
+            func.coalesce(func.sum(AnalyticsLog.cost_saved_usd), 0.0).label("total_retrieval_savings"),
+            func.coalesce(func.sum(AnalyticsLog.ingestion_cost_usd), 0.0).label("total_ingestion_cost"),
+            func.count(AnalyticsLog.id).label("total_requests"),
+        ).where(
+            and_(
+                AnalyticsLog.user_id == user_id,
+                AnalyticsLog.created_at >= since,
+            )
+        )
+
+        result = await db.execute(stmt)
+        row = result.one()
+
+        total_retrieval_savings = round(float(row.total_retrieval_savings), 6)
+        total_ingestion_cost = round(float(row.total_ingestion_cost), 6)
+        net_savings = round(total_retrieval_savings - total_ingestion_cost, 6)
+        total_requests = int(row.total_requests)
+
+        if total_requests > 0 and total_retrieval_savings > 0:
+            avg_retrieval_savings = total_retrieval_savings / total_requests
+            avg_ingestion_cost = total_ingestion_cost / total_requests
+            break_even = round(avg_ingestion_cost / avg_retrieval_savings, 4) if avg_retrieval_savings > 0 else 0.0
+        else:
+            break_even = 0.0
+
+        return ROISummary(
+            total_retrieval_savings_usd=total_retrieval_savings,
+            total_ingestion_cost_usd=total_ingestion_cost,
+            net_savings_usd=net_savings,
+            break_even_retrievals=break_even,
+            ingestion_model=ingestion_model,
             days=days,
         )
 

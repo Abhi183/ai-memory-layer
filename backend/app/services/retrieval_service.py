@@ -24,7 +24,14 @@ from sqlalchemy import select, and_, text
 
 from app.models.memory import Memory, MemoryEmbedding, MemoryStatus, MemoryType
 from app.models.user import User
-from app.schemas.memory import MemorySearchRequest, MemorySearchResult, ContextRequest, ContextResponse
+from app.schemas.memory import (
+    MemorySearchRequest,
+    MemorySearchResult,
+    ContextRequest,
+    ContextResponse,
+    ContextExplainResponse,
+    MemoryScoreBreakdown,
+)
 from app.services.embedding_service import embedding_service
 from app.services.encryption_service import decrypt
 from app.config import settings
@@ -111,6 +118,9 @@ class RetrievalService:
         db: AsyncSession,
         user: User,
         request: ContextRequest,
+        use_adaptive_k: bool = True,
+        use_multi_hop: bool = False,
+        multi_hop_depth: int = 2,
     ) -> ContextResponse:
         """
         Given a prompt, retrieve relevant memories and return an augmented prompt
@@ -123,13 +133,44 @@ class RetrievalService:
             [END CONTEXT]
 
             <original prompt>
+
+        Args:
+            use_adaptive_k:  When True, dynamically pick k via adaptive_k() instead
+                             of using request.max_memories as a hard cap.
+            use_multi_hop:   When True, run multi-hop retrieval (MSA Memory Interleave).
+            multi_hop_depth: Number of hops when use_multi_hop is True.
         """
-        search_req = MemorySearchRequest(
-            query=request.prompt,
-            limit=request.max_memories,
-            similarity_threshold=settings.similarity_threshold,
-        )
-        results = await self.search(db, user.id, search_req)
+        # Prefer fields from the request object if they override the parameter defaults.
+        _adaptive_k_flag = getattr(request, "use_adaptive_k", use_adaptive_k)
+        _multi_hop_flag = getattr(request, "use_multi_hop", use_multi_hop)
+        _hop_depth = getattr(request, "multi_hop_depth", multi_hop_depth)
+
+        if _multi_hop_flag:
+            from app.services.adaptive_retrieval import multi_hop_retrieve
+            scored_pairs = await multi_hop_retrieve(
+                db=db,
+                user_id=user.id,
+                query=request.prompt,
+                embedding_service=embedding_service,
+                hops=_hop_depth,
+                k_per_hop=request.max_memories,
+            )
+            # Build MemorySearchResult list from (Memory, score) pairs
+            results = [
+                MemorySearchResult(
+                    memory=mem,
+                    similarity_score=round(score, 4),
+                    relevance_rank=rank + 1,
+                )
+                for rank, (mem, score) in enumerate(scored_pairs[: request.max_memories * 2])
+            ]
+        else:
+            search_req = MemorySearchRequest(
+                query=request.prompt,
+                limit=request.max_memories,
+                similarity_threshold=settings.similarity_threshold,
+            )
+            results = await self.search(db, user.id, search_req)
 
         if not results:
             return ContextResponse(
@@ -139,14 +180,25 @@ class RetrievalService:
                 context_tokens_used=0,
             )
 
-        # Build context block, respecting token budget
+        # ── Adaptive-k selection ─────────────────────────────────────────────
+        if _adaptive_k_flag:
+            from app.services.adaptive_retrieval import adaptive_k
+            scores = [r.similarity_score for r in results]
+            k = adaptive_k(
+                scores,
+                min_k=1,
+                max_k=request.max_memories,
+                threshold=settings.similarity_threshold,
+            )
+            results = results[:k]
+
+        # ── Build context block, respecting token budget ──────────────────────
         context_lines = []
         tokens_used = 0
 
         for result in results:
             mem = result.memory
             snippet = mem.summary or mem.content[:300]
-            # Truncate long snippets
             line = f"- {snippet.strip()}"
             line_tokens = embedding_service.count_tokens(line)
 
@@ -164,6 +216,205 @@ class RetrievalService:
             augmented_prompt=augmented,
             injected_memories=results[: len(context_lines)],
             context_tokens_used=tokens_used,
+        )
+
+    async def get_context_explain(
+        self,
+        db: AsyncSession,
+        user: User,
+        request: ContextRequest,
+    ) -> ContextExplainResponse:
+        """
+        Debug version of get_context that returns a full score breakdown showing:
+          - Per-memory cosine / recency / importance scores
+          - Which retrieval hop surfaced each memory
+          - Whether adaptive-k was triggered and what k it chose
+          - Total T_aug tokens
+        """
+        _adaptive_k_flag = getattr(request, "use_adaptive_k", True)
+        _multi_hop_flag = getattr(request, "use_multi_hop", False)
+        _hop_depth = getattr(request, "multi_hop_depth", 2)
+
+        candidate_breakdowns: list[MemoryScoreBreakdown] = []
+        hops_executed = 1
+
+        if _multi_hop_flag:
+            from app.services.adaptive_retrieval import multi_hop_retrieve
+            scored_pairs = await multi_hop_retrieve(
+                db=db,
+                user_id=user.id,
+                query=request.prompt,
+                embedding_service=embedding_service,
+                hops=_hop_depth,
+                k_per_hop=request.max_memories,
+            )
+            hops_executed = _hop_depth
+
+            # We need raw per-component scores for the breakdown.
+            # multi_hop_retrieve returns composite scores; re-derive components
+            # from a fresh vector search for transparency.
+            hop1_embedding = await embedding_service.embed(request.prompt)
+            hop1_raw = await self._vector_search(
+                db,
+                user_id=user.id,
+                query_embedding=hop1_embedding,
+                limit=request.max_memories * 3,
+            )
+            salt = await self._get_salt(db, user.id)
+            hop1_ids = set()
+            for memory, cosine_sim in hop1_raw:
+                recency = _recency_score(memory.captured_at)
+                composite = (
+                    W_SIMILARITY * cosine_sim
+                    + W_RECENCY * recency
+                    + W_IMPORTANCE * memory.importance_score
+                )
+                try:
+                    summary = decrypt(memory.summary, salt) if memory.summary else None
+                    content = decrypt(memory.content, salt)
+                except Exception:
+                    summary = None
+                    content = "[decryption error]"
+
+                snippet = (summary or content)[:120]
+                candidate_breakdowns.append(
+                    MemoryScoreBreakdown(
+                        memory_id=memory.id,
+                        summary_snippet=snippet,
+                        cosine_score=round(cosine_sim, 4),
+                        recency_score=round(recency, 4),
+                        importance_score=round(memory.importance_score, 4),
+                        composite_score=round(composite, 4),
+                        hop=1,
+                    )
+                )
+                hop1_ids.add(memory.id)
+
+            # Mark hop-2 memories
+            for mem, score in scored_pairs:
+                if mem.id not in hop1_ids:
+                    # Approximate cosine from composite (we don't have raw value here)
+                    candidate_breakdowns.append(
+                        MemoryScoreBreakdown(
+                            memory_id=mem.id,
+                            summary_snippet=(mem.summary or mem.content)[:120],
+                            cosine_score=round(score, 4),  # best approximation
+                            recency_score=round(_recency_score(mem.captured_at), 4),
+                            importance_score=round(mem.importance_score, 4),
+                            composite_score=round(score, 4),
+                            hop=2,
+                        )
+                    )
+
+            results = [
+                MemorySearchResult(
+                    memory=mem,
+                    similarity_score=round(score, 4),
+                    relevance_rank=rank + 1,
+                )
+                for rank, (mem, score) in enumerate(scored_pairs[: request.max_memories * 2])
+            ]
+        else:
+            # Single-hop path — collect full score breakdown
+            query_embedding = await embedding_service.embed(request.prompt)
+            raw_results = await self._vector_search(
+                db,
+                user_id=user.id,
+                query_embedding=query_embedding,
+                limit=request.max_memories * 3,
+            )
+            salt = await self._get_salt(db, user.id)
+
+            scored = []
+            for memory, cosine_sim in raw_results:
+                if cosine_sim < settings.similarity_threshold:
+                    continue
+
+                recency = _recency_score(memory.captured_at)
+                composite = (
+                    W_SIMILARITY * cosine_sim
+                    + W_RECENCY * recency
+                    + W_IMPORTANCE * memory.importance_score
+                )
+
+                try:
+                    memory.content = decrypt(memory.content, salt)
+                    if memory.summary:
+                        memory.summary = decrypt(memory.summary, salt)
+                except Exception:
+                    memory.content = "[decryption error]"
+
+                snippet = (memory.summary or memory.content)[:120]
+                candidate_breakdowns.append(
+                    MemoryScoreBreakdown(
+                        memory_id=memory.id,
+                        summary_snippet=snippet,
+                        cosine_score=round(cosine_sim, 4),
+                        recency_score=round(recency, 4),
+                        importance_score=round(memory.importance_score, 4),
+                        composite_score=round(composite, 4),
+                        hop=1,
+                    )
+                )
+                scored.append((memory, composite))
+
+            scored.sort(key=lambda x: x[1], reverse=True)
+            scored = scored[: request.max_memories]
+
+            results = [
+                MemorySearchResult(
+                    memory=mem,
+                    similarity_score=round(score, 4),
+                    relevance_rank=rank + 1,
+                )
+                for rank, (mem, score) in enumerate(scored)
+            ]
+
+        # ── Adaptive-k ───────────────────────────────────────────────────────
+        adaptive_k_chosen: Optional[int] = None
+        if _adaptive_k_flag and results:
+            from app.services.adaptive_retrieval import adaptive_k as _adaptive_k_fn
+            scores = [r.similarity_score for r in results]
+            adaptive_k_chosen = _adaptive_k_fn(
+                scores,
+                min_k=1,
+                max_k=request.max_memories,
+                threshold=settings.similarity_threshold,
+            )
+            results = results[:adaptive_k_chosen]
+
+        # ── Token budget ─────────────────────────────────────────────────────
+        context_lines = []
+        tokens_used = 0
+        for result in results:
+            mem = result.memory
+            snippet = mem.summary or mem.content[:300]
+            line = f"- {snippet.strip()}"
+            line_tokens = embedding_service.count_tokens(line)
+            if tokens_used + line_tokens > request.max_tokens:
+                break
+            context_lines.append(line)
+            tokens_used += line_tokens
+
+        if context_lines:
+            context_block = "[MEMORY CONTEXT]\n" + "\n".join(context_lines) + "\n[END CONTEXT]"
+            augmented = f"{context_block}\n\n{request.prompt}"
+        else:
+            augmented = request.prompt
+
+        # Sort breakdowns by composite score for readability
+        candidate_breakdowns.sort(key=lambda x: x.composite_score, reverse=True)
+
+        return ContextExplainResponse(
+            original_prompt=request.prompt,
+            candidate_scores=candidate_breakdowns,
+            injected_memories=results[: len(context_lines)],
+            adaptive_k_used=_adaptive_k_flag,
+            adaptive_k_chosen=adaptive_k_chosen,
+            multi_hop_used=_multi_hop_flag,
+            hops_executed=hops_executed,
+            context_tokens_used=tokens_used,
+            augmented_prompt=augmented,
         )
 
     # ── Internal ───────────────────────────────────────────────────────────────

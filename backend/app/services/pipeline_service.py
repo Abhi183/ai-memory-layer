@@ -25,6 +25,7 @@ from openai import AsyncOpenAI
 from app.models.memory import Memory, MemoryEmbedding, MemoryStatus, MemoryType
 from app.services.embedding_service import embedding_service
 from app.services.encryption_service import encrypt, decrypt
+from app.services.pricing import calculate_ingestion_cost
 from app.config import settings
 
 log = structlog.get_logger()
@@ -58,14 +59,36 @@ Return ONLY "long_term" or "short_term".
 """
 
 
+class IngestionTokenUsage:
+    """Accumulates token counts across all pipeline LLM calls."""
+
+    def __init__(self) -> None:
+        self.input_tokens: int = 0
+        self.output_tokens: int = 0
+
+    def add(self, input_tokens: int, output_tokens: int) -> None:
+        self.input_tokens += input_tokens
+        self.output_tokens += output_tokens
+
+    def cost_usd(self, model: str = "gpt-4o-mini") -> float:
+        return calculate_ingestion_cost(self.input_tokens, self.output_tokens, model)
+
+
 class PipelineService:
 
-    async def process_memory(self, db: AsyncSession, memory_id: uuid.UUID):
-        """Entry point: process a single memory through the full pipeline."""
+    async def process_memory(self, db: AsyncSession, memory_id: uuid.UUID) -> IngestionTokenUsage:
+        """
+        Entry point: process a single memory through the full pipeline.
+
+        Returns an IngestionTokenUsage object so callers can record the
+        total LLM cost incurred during ingestion.
+        """
+        usage = IngestionTokenUsage()
+
         memory = await db.get(Memory, memory_id)
         if memory is None:
             log.error("pipeline_memory_not_found", memory_id=str(memory_id))
-            return
+            return usage
 
         from sqlalchemy import select
         from app.models.user import User
@@ -82,14 +105,17 @@ class PipelineService:
             plaintext = decrypt(memory.content, salt)
 
             # Step 2: Extract facts
-            facts = await self._extract_facts(plaintext)
+            facts, fact_usage = await self._extract_facts(plaintext)
+            usage.add(fact_usage.input_tokens, fact_usage.output_tokens)
 
             # Step 3: Summarize
-            summary = await self._summarize(plaintext)
+            summary, sum_usage = await self._summarize(plaintext)
+            usage.add(sum_usage.input_tokens, sum_usage.output_tokens)
 
             # Step 4: Classify memory type
             if facts:
-                memory_type = await self._classify_type(facts)
+                memory_type, cls_usage = await self._classify_type(facts)
+                usage.add(cls_usage.input_tokens, cls_usage.output_tokens)
             else:
                 memory_type = MemoryType.SHORT_TERM
 
@@ -125,7 +151,14 @@ class PipelineService:
                 db.add(emb)
 
             await db.commit()
-            log.info("pipeline_success", memory_id=str(memory_id), type=memory_type)
+            log.info(
+                "pipeline_success",
+                memory_id=str(memory_id),
+                type=memory_type,
+                ingestion_input_tokens=usage.input_tokens,
+                ingestion_output_tokens=usage.output_tokens,
+                ingestion_cost_usd=usage.cost_usd(),
+            )
 
         except Exception as exc:
             log.error("pipeline_failed", memory_id=str(memory_id), error=str(exc))
@@ -133,14 +166,17 @@ class PipelineService:
             await db.commit()
             raise
 
+        return usage
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
         retry=retry_if_exception_type(Exception),
     )
-    async def _extract_facts(self, content: str) -> list[str]:
+    async def _extract_facts(self, content: str) -> tuple[list[str], IngestionTokenUsage]:
+        usage = IngestionTokenUsage()
         if not settings.openai_api_key:
-            return []
+            return [], usage
         try:
             client = AsyncOpenAI(api_key=settings.openai_api_key)
             response = await client.chat.completions.create(
@@ -154,21 +190,25 @@ class PipelineService:
                 max_tokens=500,
                 temperature=0.1,
             )
+            if response.usage:
+                usage.add(response.usage.prompt_tokens, response.usage.completion_tokens)
             raw = response.choices[0].message.content.strip()
             data = json.loads(raw)
-            return data.get("facts", [])
+            return data.get("facts", []), usage
         except Exception as exc:
             log.warning("fact_extraction_failed", error=str(exc))
-            return []
+            return [], usage
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
     )
-    async def _summarize(self, content: str) -> Optional[str]:
+    async def _summarize(self, content: str) -> tuple[Optional[str], IngestionTokenUsage]:
+        usage = IngestionTokenUsage()
         if not settings.openai_api_key:
-            # Naive truncation fallback
-            return content[:200] + "..." if len(content) > 200 else content
+            # Naive truncation fallback — no LLM cost
+            summary = content[:200] + "..." if len(content) > 200 else content
+            return summary, usage
         try:
             client = AsyncOpenAI(api_key=settings.openai_api_key)
             response = await client.chat.completions.create(
@@ -182,14 +222,17 @@ class PipelineService:
                 max_tokens=200,
                 temperature=0.3,
             )
-            return response.choices[0].message.content.strip()
+            if response.usage:
+                usage.add(response.usage.prompt_tokens, response.usage.completion_tokens)
+            return response.choices[0].message.content.strip(), usage
         except Exception as exc:
             log.warning("summarization_failed", error=str(exc))
-            return None
+            return None, usage
 
-    async def _classify_type(self, facts: list[str]) -> MemoryType:
+    async def _classify_type(self, facts: list[str]) -> tuple[MemoryType, IngestionTokenUsage]:
+        usage = IngestionTokenUsage()
         if not settings.openai_api_key or not facts:
-            return MemoryType.SHORT_TERM
+            return MemoryType.SHORT_TERM, usage
         try:
             client = AsyncOpenAI(api_key=settings.openai_api_key)
             response = await client.chat.completions.create(
@@ -205,10 +248,13 @@ class PipelineService:
                 max_tokens=10,
                 temperature=0,
             )
+            if response.usage:
+                usage.add(response.usage.prompt_tokens, response.usage.completion_tokens)
             result = response.choices[0].message.content.strip().lower()
-            return MemoryType.LONG_TERM if "long_term" in result else MemoryType.SHORT_TERM
+            memory_type = MemoryType.LONG_TERM if "long_term" in result else MemoryType.SHORT_TERM
+            return memory_type, usage
         except Exception:
-            return MemoryType.SHORT_TERM
+            return MemoryType.SHORT_TERM, usage
 
 
 pipeline_service = PipelineService()

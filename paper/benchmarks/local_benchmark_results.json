@@ -1,0 +1,355 @@
+{
+  "model": "all-MiniLM-L6-v2",
+  "index": "FAISS HNSW (M=32, efSearch=50)",
+  "corpus_size": 45,
+  "embedding_dim": 45,
+  "num_eval_queries": 20,
+  "num_stress_queries": 100,
+  "retrieval_quality": {
+    "hit_at_1": 0,
+    "hit_at_3": 0,
+    "hit_at_5": 0.1,
+    "precision_at_1": 0.0,
+    "precision_at_3": 0.0,
+    "precision_at_5": 0.02,
+    "precision_at_1_std": 0.0,
+    "precision_at_5_std": 0.0616
+  },
+  "latency_ms": {
+    "embed": {
+      "p50": 0.67,
+      "p95": 0.79,
+      "mean": 0.68
+    },
+    "hnsw_search": {
+      "p50": 0.01,
+      "p95": 0.79,
+      "mean": 0.01
+    },
+    "rerank": {
+      "p50": 0.01,
+      "p95": 0.79,
+      "mean": 0.01
+    },
+    "total": {
+      "p50": 0.69,
+      "p90": 0.73,
+      "p95": 0.79,
+      "p99": 0.94,
+      "mean": 0.7,
+      "std": 0.04,
+      "min": 0.68,
+      "max": 0.94
+    }
+  },
+  "per_query_results": [
+    {
+      "query": "What framework does the user prefer for Python web APIs?",
+      "hit@5": true,
+      "p@5": 0.2,
+      "top5_ids": [
+        6,
+        44,
+        40,
+        0,
+        7
+      ],
+      "relevant": [
+        1,
+        7
+      ]
+    },
+    {
+      "query": "Who is the user's manager and when do they meet?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        28,
+        4,
+        11,
+        20,
+        35
+      ],
+      "relevant": [
+        2
+      ]
+    },
+    {
+      "query": "What is the deadline for the campus portal project?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        11,
+        2,
+        33,
+        3,
+        5
+      ],
+      "relevant": [
+        9,
+        0
+      ]
+    },
+    {
+      "query": "What database index type was chosen and why?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        17,
+        44,
+        1,
+        4,
+        20
+      ],
+      "relevant": [
+        15
+      ]
+    },
+    {
+      "query": "What encryption algorithm is used for data at rest?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        6,
+        14,
+        24,
+        28,
+        12
+      ],
+      "relevant": [
+        16
+      ]
+    },
+    {
+      "query": "What are the user's code style and linting preferences?",
+      "hit@5": true,
+      "p@5": 0.2,
+      "top5_ids": [
+        40,
+        0,
+        27,
+        32,
+        11
+      ],
+      "relevant": [
+        12,
+        11,
+        10
+      ]
+    },
+    {
+      "query": "Tell me about the security issue found in the architecture review.",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        4,
+        43,
+        34,
+        38,
+        10
+      ],
+      "relevant": [
+        22,
+        8
+      ]
+    },
+    {
+      "query": "What machine does the user develop on?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        21,
+        34,
+        36,
+        24,
+        1
+      ],
+      "relevant": [
+        25
+      ]
+    },
+    {
+      "query": "What is the current sprint focused on?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        34,
+        36,
+        44,
+        26,
+        28
+      ],
+      "relevant": [
+        20
+      ]
+    },
+    {
+      "query": "Was Pinecone considered for vector storage?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        6,
+        40,
+        7,
+        23,
+        32
+      ],
+      "relevant": [
+        19
+      ]
+    },
+    {
+      "query": "What is the user's promotion timeline?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        6,
+        40,
+        4,
+        44,
+        1
+      ],
+      "relevant": [
+        24
+      ]
+    },
+    {
+      "query": "What Celery bug was fixed recently?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        6,
+        22,
+        24,
+        28,
+        4
+      ],
+      "relevant": [
+        35
+      ]
+    },
+    {
+      "query": "How does the user approach code reviews?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        6,
+        40,
+        4,
+        2,
+        3
+      ],
+      "relevant": [
+        41,
+        43
+      ]
+    },
+    {
+      "query": "What local LLM model is the user running?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        40,
+        4,
+        44,
+        1,
+        24
+      ],
+      "relevant": [
+        27
+      ]
+    },
+    {
+      "query": "What are the user's Q2 goals?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        6,
+        33,
+        40,
+        4,
+        2
+      ],
+      "relevant": [
+        31,
+        32
+      ]
+    },
+    {
+      "query": "What is the production database size?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        6,
+        33,
+        24,
+        43,
+        26
+      ],
+      "relevant": [
+        29
+      ]
+    },
+    {
+      "query": "What authentication issue needs to be fixed?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        6,
+        24,
+        13,
+        33,
+        18
+      ],
+      "relevant": [
+        8,
+        22
+      ]
+    },
+    {
+      "query": "What state management libraries does the user prefer in React?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        44,
+        1,
+        0,
+        24,
+        34
+      ],
+      "relevant": [
+        14
+      ]
+    },
+    {
+      "query": "What is the monthly API budget for LLM usage?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        6,
+        1,
+        17,
+        24,
+        31
+      ],
+      "relevant": [
+        23
+      ]
+    },
+    {
+      "query": "Which book is the user currently reading?",
+      "hit@5": false,
+      "p@5": 0.0,
+      "top5_ids": [
+        40,
+        4,
+        44,
+        1,
+        24
+      ],
+      "relevant": [
+        30
+      ]
+    }
+  ]
+}

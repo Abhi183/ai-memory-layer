@@ -20,7 +20,13 @@ from rich.table import Table
 from rich import box
 
 from mem_ai import client
-from mem_ai.config import CONFIG_DIR, config
+from mem_ai.config import (
+    CONFIG_DIR,
+    config,
+    get_master_passphrase,
+    prompt_and_store_passphrase,
+    store_master_passphrase,
+)
 from mem_ai.providers import PROVIDERS
 
 console = Console()
@@ -270,6 +276,11 @@ def auth() -> None:
 def auth_login(email: Optional[str], password: Optional[str]) -> None:
     """Authenticate with the memory layer and save your token.
 
+    Two separate credentials are used:\n
+      1. HTTP password  — used for API authentication (sent to the server).\n
+      2. Master passphrase — used ONLY for local encryption key derivation
+         (argon2id).  It is NEVER sent to the server.\n
+
     Example:\n
       mem-ai auth login\n
       mem-ai auth login --email user@example.com
@@ -277,7 +288,7 @@ def auth_login(email: Optional[str], password: Optional[str]) -> None:
     if not email:
         email = Prompt.ask("Email")
     if not password:
-        password = getpass.getpass("Password: ")
+        password = getpass.getpass("Password (HTTP login): ")
 
     console.print(f"Connecting to [cyan]{config.api_url}[/cyan]...")
     result = client.login(email, password)
@@ -290,6 +301,41 @@ def auth_login(email: Optional[str], password: Optional[str]) -> None:
     config.set("token", token)
     console.print("[bold green]Logged in successfully.[/bold green]")
     console.print(f"Token stored in [dim]{CONFIG_DIR / 'config.json'}[/dim]")
+
+    # --- Master passphrase (encryption key derivation) ----------------------
+    # Separate from the HTTP password.  Check keychain first; only prompt if
+    # no passphrase is stored yet.
+    username = email  # keychain key is the account email
+    existing = get_master_passphrase(username)
+    if existing:
+        console.print(
+            "[dim]Master passphrase already stored in OS keychain — "
+            "encryption ready.[/dim]"
+        )
+    else:
+        console.print(
+            "\n[bold yellow]Master passphrase not found.[/bold yellow]\n"
+            "This passphrase encrypts your memories locally.  "
+            "It is [bold]not[/bold] sent to the server.\n"
+            "Leave blank to skip (you will be prompted on each session start)."
+        )
+        try:
+            passphrase = getpass.getpass("Master passphrase (leave blank to skip): ")
+            if passphrase:
+                confirm = getpass.getpass("Confirm master passphrase: ")
+                if passphrase != confirm:
+                    console.print("[red]Passphrases did not match — skipping keychain storage.[/red]")
+                else:
+                    stored = store_master_passphrase(username, passphrase)
+                    if stored:
+                        console.print("[green]Master passphrase saved to OS keychain.[/green]")
+                    else:
+                        console.print(
+                            "[yellow]Could not save to OS keychain.  "
+                            "Set MEM_AI_PASSPHRASE in your environment.[/yellow]"
+                        )
+        except (EOFError, KeyboardInterrupt):
+            console.print("\n[dim]Master passphrase setup skipped.[/dim]")
 
 
 @auth.command("logout")
@@ -342,15 +388,43 @@ def setup() -> None:
 
     # Auth
     do_login = Prompt.ask("Log in now?", choices=["y", "n"], default="y")
+    logged_in_email: Optional[str] = None
     if do_login == "y":
         email = Prompt.ask("Email")
-        password = getpass.getpass("Password: ")
+        password = getpass.getpass("Password (HTTP login): ")
         result = client.login(email, password)
         if result:
             config.set("token", result.get("access_token", ""))
             console.print("[green]Authentication successful.[/green]")
+            logged_in_email = email
         else:
             console.print("[yellow]Login skipped (could not connect).[/yellow]")
+
+    # Master passphrase setup
+    # This is a SEPARATE credential from the HTTP password.  It is used only
+    # for local AES-256-GCM key derivation (argon2id) and never sent to any
+    # server.
+    if logged_in_email:
+        existing_passphrase = get_master_passphrase(logged_in_email)
+        if existing_passphrase:
+            console.print(
+                "[dim]Master passphrase already stored in OS keychain.[/dim]"
+            )
+        else:
+            console.print(
+                "\n[bold]Encryption passphrase setup[/bold]\n\n"
+                "Your memories are encrypted on this machine using a master passphrase.\n"
+                "This passphrase is [bold]separate[/bold] from your login password\n"
+                "and is [bold]never[/bold] sent to any server.\n"
+            )
+            do_passphrase = Prompt.ask(
+                "Set up master passphrase now?", choices=["y", "n"], default="y"
+            )
+            if do_passphrase == "y":
+                try:
+                    prompt_and_store_passphrase(logged_in_email)
+                except ValueError as exc:
+                    console.print(f"[red]{exc}[/red] Passphrase not saved.")
 
     console.print(
         f"\n[bold green]Setup complete![/bold green] "

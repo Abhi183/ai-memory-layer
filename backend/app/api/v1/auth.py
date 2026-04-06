@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead, UserLogin, Token
 from app.middleware.auth import hash_password, verify_password, create_access_token
-from app.services.encryption_service import generate_user_salt
+from app.services.encryption_service import generate_user_salt, generate_per_user_secret
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -23,6 +23,10 @@ async def register(data: UserCreate, db: AsyncSession = Depends(get_db)):
         username=data.username,
         hashed_password=hash_password(data.password),
         encryption_salt=generate_user_salt(),
+        # per_user_secret is used by Option B (server deployments) as the sole
+        # KDF input material.  Each user has a unique random secret so that
+        # the server cannot derive a master key that decrypts all users' data.
+        per_user_secret=generate_per_user_secret(),
     )
     db.add(user)
     await db.commit()

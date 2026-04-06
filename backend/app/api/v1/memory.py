@@ -13,7 +13,7 @@ from app.models.memory import MemoryType
 from app.schemas.memory import (
     MemoryCreate, MemoryRead, MemoryUpdate,
     MemorySearchRequest, MemorySearchResult,
-    ContextRequest, ContextResponse,
+    ContextRequest, ContextResponse, ContextExplainResponse,
     MemoryCaptureRequest,
 )
 from app.services.memory_service import memory_service
@@ -88,6 +88,11 @@ async def get_context(
     Given a prompt, return an augmented version with relevant memory context injected.
     Used by browser extensions and integrations before sending to an AI system.
 
+    Supports MSA-inspired features via request body fields:
+      - `use_adaptive_k`   (default True)  — dynamically selects k based on score gaps.
+      - `use_multi_hop`    (default False) — two-pass retrieval for bridging memories.
+      - `multi_hop_depth`  (default 2)     — number of hops when use_multi_hop is True.
+
     Also fires a background analytics log so the caller can track token / cost savings.
     """
     start_ms = time.monotonic_ns() // 1_000_000  # milliseconds
@@ -128,9 +133,45 @@ async def get_context(
         hit_count=hit_count,
         latency_ms=latency_ms,
         tokens_used=augmented_tokens,
+        adaptive_k=data.use_adaptive_k,
+        multi_hop=data.use_multi_hop,
     )
 
     return context_response
+
+
+@router.post("/context/explain", response_model=ContextExplainResponse)
+async def explain_context(
+    data: ContextRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Debug view of what the /context endpoint would inject and why.
+
+    Returns a detailed breakdown for each candidate memory:
+      - Cosine similarity, recency score, importance score, composite score
+      - Which retrieval hop (1 = direct match, 2 = bridging) surfaced the memory
+      - Whether adaptive-k was triggered and the k it chose
+      - Total T_aug tokens that would be injected
+      - The full augmented prompt that would have been returned
+
+    Useful for tuning importance scores, understanding retrieval behaviour, or
+    debugging why a specific memory was or wasn't included.
+    """
+    explain_response = await retrieval_service.get_context_explain(db, user, data)
+
+    log.debug(
+        "memory.context.explain",
+        user_id=str(user.id),
+        candidates=len(explain_response.candidate_scores),
+        injected=len(explain_response.injected_memories),
+        adaptive_k_chosen=explain_response.adaptive_k_chosen,
+        hops=explain_response.hops_executed,
+        tokens_used=explain_response.context_tokens_used,
+    )
+
+    return explain_response
 
 
 @router.get("/{memory_id}", response_model=MemoryRead)

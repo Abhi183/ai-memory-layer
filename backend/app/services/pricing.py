@@ -81,6 +81,36 @@ def get_price_per_token(platform: str, model: str) -> float:
     return price_per_million / _TOKENS_PER_MILLION
 
 
+# Ingestion model pricing: input and output prices per 1M tokens (USD).
+# Ingestion uses gpt-4o-mini for all three pipeline steps.
+INGESTION_PRICING: dict[str, dict[str, float]] = {
+    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "claude-haiku-4-5": {"input": 0.80, "output": 4.00},
+    "default": {"input": 0.15, "output": 0.60},
+}
+
+
+def calculate_ingestion_cost(
+    input_tokens: int,
+    output_tokens: int,
+    model: str = "gpt-4o-mini",
+) -> float:
+    """
+    Calculate the USD cost of LLM API calls made during memory ingestion.
+
+    Args:
+        input_tokens:  Total input tokens consumed across all pipeline steps.
+        output_tokens: Total output tokens produced across all pipeline steps.
+        model:         Model used for ingestion (default: "gpt-4o-mini").
+
+    Returns:
+        Ingestion cost in USD, rounded to 6 decimal places.
+    """
+    pricing = INGESTION_PRICING.get(model, INGESTION_PRICING["default"])
+    cost = (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / _TOKENS_PER_MILLION
+    return round(cost, 6)
+
+
 def calculate_cost_savings(tokens_saved: int, platform: str, model: str) -> float:
     """
     Calculate the USD cost saved by not sending `tokens_saved` tokens to the provider.
