@@ -1,19 +1,21 @@
 # MemLayer — Universal Encrypted Memory for AI Agents
 
-> **Give Claude, GPT-4, Gemini, and Ollama a persistent memory — and see exactly how much it saves you.**
+> **Give Claude, GPT-4, Gemini, and Ollama a persistent memory.**
 
-MemLayer is a universal, encrypted memory layer that sits between you and any AI. It captures every interaction, extracts durable knowledge, and injects only the relevant context into future prompts — slashing token usage by ~90% and your API bill along with it.
+MemLayer is a universal, encrypted memory layer that sits between you and any AI. It captures every interaction, extracts durable knowledge, and injects only the relevant context into future prompts — so each session picks up where the last one left off without re-sending your entire conversation history.
 
 ```
 You  →  mem-ai ask "How do I fix this React hook?"
                 ↓
-        Retrieves 3 relevant memories (142 tokens)
-        vs. resending 14,800 tokens of history
+        Retrieves relevant memories (~500 tokens of facts)
+        instead of re-sending your full session history
                 ↓
    claude / gpt-4o / gemini / ollama  →  Answer
                 ↓
         Captures this interaction as a new memory
 ```
+
+**How much it actually saves depends on your session length.** If your conversation history is 10,000 tokens and the injected memory context is 600 tokens, you save 9,400 tokens on that query. The economics dashboard shows you the real numbers from your own usage.
 
 ---
 
@@ -22,9 +24,9 @@ You  →  mem-ai ask "How do I fix this React hook?"
 | Problem | MemLayer's answer |
 |---------|-------------------|
 | LLMs are stateless — every session starts from zero | Persistent encrypted memory store per user |
-| Context costs scale O(N²) — each turn re-sends all history | Extract-compress-retrieve: inject only what matters |
+| Re-sending full history costs more each turn | Extract-compress-retrieve: inject only what matters |
 | Memory solutions are provider-locked | Universal adapter: Claude, GPT-4, Gemini, Ollama |
-| No visibility into what memory is saving you | Economics engine: real-time token/cost dashboard |
+| No visibility into what memory is saving you | Economics engine: tracks real token/cost savings per query |
 | Memory stored in the cloud is a privacy risk | AES-256-GCM encryption, per-user key derivation |
 
 ---
@@ -32,7 +34,7 @@ You  →  mem-ai ask "How do I fix this React hook?"
 ## Key Features
 
 - **Universal CLI wrapper** — wrap any AI CLI: `mem-ai ask "prompt" --provider claude`
-- **Economics dashboard** — see exact tokens saved, cost saved ($), compression ratio per provider
+- **Economics dashboard** — see actual tokens saved, cost saved ($), per provider, from your own usage
 - **MCP server** — native Claude Code integration via Model Context Protocol
 - **Browser extension** — auto-injects memory into ChatGPT and Claude web interfaces
 - **Encrypted at rest** — AES-256-GCM with PBKDF2 key derivation, no key storage
@@ -75,7 +77,7 @@ mem-ai ask "Help me debug this" --provider ollama --model llama3
 # Search your memories:
 mem-ai search "React hooks"
 
-# See your savings:
+# See your actual savings from your own usage:
 mem-ai stats
 ```
 
@@ -115,7 +117,7 @@ Now Claude Code can automatically search your memories and capture new ones.
 │  │               MEMORY LAYER  (localhost:8000)                │  │
 │  │  • Semantic search over user memories (pgvector)            │  │
 │  │  • Composite re-ranking: 0.7×sim + 0.2×recency + 0.1×imp   │  │
-│  │  • Token/cost accounting (economics engine)                  │  │
+│  │  • Token/cost accounting per query                          │  │
 │  └──────────────────────────┬───────────────────────────────────┘  │
 │                             │                                       │
 └─────────────────────────────┼───────────────────────────────────────┘
@@ -139,19 +141,23 @@ Now Claude Code can automatically search your memories and capture new ones.
 
 ```
 final_score = 0.70 × cosine_similarity(query, memory)
-            + 0.20 × exp(-days_old / 30)     # recency decay
-            + 0.10 × importance_score         # 0.0–1.0
+            + 0.20 × 2^(-days_old / 30)   # recency decay, 30-day half-life
+            + 0.10 × importance_score      # 0.0–1.0
 ```
 
-### Economics Engine
+### How cost savings are calculated
 
-Every call to `/memory/context` logs:
-- `original_tokens`: baseline full-context estimate (15,000 tokens default)
-- `augmented_tokens`: actual tokens injected
-- `tokens_saved`: the difference
-- `cost_saved_usd`: `tokens_saved × price_per_1M_tokens / 1_000_000`
+Every call to `/memory/context` logs the token counts and computes the savings:
 
-Provider pricing (per 1M input tokens):
+```
+tokens_saved  = full_history_tokens - injected_context_tokens
+cost_saved    = tokens_saved × price_per_1M_tokens / 1,000,000
+```
+
+The `full_history_tokens` is the actual token count of the conversation history you would have sent without memory. The `injected_context_tokens` is what was actually injected. The difference is what you saved.
+
+Provider pricing used (per 1M input tokens — verify current rates at each provider):
+
 | Provider | Model | Price |
 |----------|-------|-------|
 | Claude | Sonnet 4.5 | $3.00 |
@@ -181,7 +187,7 @@ GET  /api/v1/memory/               List memories
 
 ### Analytics (Economics)
 ```
-GET /api/v1/analytics/summary?days=30     Aggregate savings
+GET /api/v1/analytics/summary?days=30     Aggregate savings from your usage
 GET /api/v1/analytics/timeline?days=30    Daily time series
 GET /api/v1/analytics/providers           Per-provider breakdown
 GET /api/v1/analytics/logs?limit=50       Raw request log
@@ -199,7 +205,7 @@ mem-ai ask <prompt>             Send a prompt through the memory layer
 
 mem-ai capture <prompt> <resp>  Manually capture an exchange
 mem-ai search <query>           Search your memories
-mem-ai stats                    Show economics dashboard
+mem-ai stats                    Show savings dashboard (from your actual usage)
 mem-ai auth login/logout        Authenticate
 mem-ai setup                    Interactive first-time setup
 mem-ai install-hooks            Add shell hooks to .zshrc/.bashrc
@@ -229,43 +235,20 @@ ai-memory-layer/
 │       ├── memory/        Memory browser UI
 │       └── analytics/     Token savings charts
 ├── extension/             Chrome/Firefox browser extension
-└── paper/                 Academic paper + benchmarks
-    ├── ai_memory_layer.md Full research paper (5,100 words)
-    └── benchmarks/        Reproducible evaluation scripts
-```
-
----
-
-## Benchmarks
-
-From our evaluation on LOCOMO-style synthetic conversations (see `paper/benchmarks/`):
-
-| Method | Avg Tokens/Query | Monthly Cost (team of 10) | Quality |
-|--------|-----------------|--------------------------|---------|
-| Full context | 15,000 | $847 (Claude Sonnet) | Baseline |
-| No memory | 500 | $28 | Degrades over time |
-| **MemLayer** | **~1,024** | **$61** | 98% of full-context |
-
-- **93.2% token reduction** vs. full-context baseline
-- **Retrieval Precision@5 = 0.84** on synthetic LOCOMO conversations
-- **~42ms** median retrieval latency (negligible vs. LLM generation)
-
-Run the benchmarks yourself:
-```bash
-cd paper/benchmarks
-pip install rich tiktoken numpy
-python run_benchmarks.py --output results.json
+└── paper/                 Academic paper
+    ├── memlayer.tex        LaTeX source
+    └── memlayer.pdf        Compiled PDF
 ```
 
 ---
 
 ## Academic Paper
 
-The full research paper is at [`paper/ai_memory_layer.md`](paper/ai_memory_layer.md).
+The paper is at [`paper/memlayer.tex`](paper/memlayer.tex) (compiled [`paper/memlayer.pdf`](paper/memlayer.pdf)).
 
-> **MemLayer: A Universal Encrypted Memory Architecture for Cross-Provider LLM Context Efficiency**
+> **MemLayer: A Universal Encrypted Memory Layer for Cross-Provider LLM Context Efficiency**
 >
-> Abstract: Large language models are fundamentally stateless — each session starts with no memory of prior interactions. Re-sending conversation history to restore context consumes tokens quadratically, making long-running AI workflows prohibitively expensive. We present MemLayer, a universal encrypted memory layer that intercepts prompts from any AI provider, retrieves semantically relevant memories, and injects only the essential context. MemLayer achieves 93.2% token compression with a composite retrieval score of Precision@5 = 0.84, adding only 42ms median latency. Unlike provider-specific solutions, MemLayer adapts to Claude, GPT-4, Gemini, and Ollama through a unified interface, while an integrated economics engine gives users real-time visibility into cost savings.
+> This paper describes the system design, the retrieval algorithm, the economics model, and a projected cost analysis based on publicly available provider pricing. Empirical evaluation on real conversational data is ongoing.
 
 ---
 

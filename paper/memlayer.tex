@@ -55,17 +55,22 @@ conversation histories at cost that grows quadratically with session length.
 We present MemLayer, a provider-agnostic memory layer that intercepts prompts
 from any AI terminal --- Claude Code, GPT-4, Gemini, and Ollama --- retrieves
 semantically relevant memories via pgvector cosine similarity with composite
-re-ranking, and injects only the essential context. On a 50-conversation
-synthetic evaluation set, MemLayer reduces average token consumption from
-15,000 to 1,024 tokens per query (93.2\% Token Compression Ratio), with
-Precision@5 $= 0.84$ and a median retrieval latency of 24~ms --- less than
-3\% of typical LLM generation time. An integrated economics engine tracks
-provider-specific cost savings in real time: a team of ten developers pays
-\$61/month on Claude Sonnet~4.5 instead of \$847, a 92.8\% reduction. Unlike
-Mem0~\citep{chhikara2025mem0} and MemGPT~\citep{packer2023memgpt}, MemLayer
-requires no cloud account, encrypts all memories per-user with AES-256-GCM,
-and integrates natively with Claude Code via the Model Context Protocol. All
-code is released at \url{https://github.com/Abhi183/ai-memory-layer}.
+re-ranking, and injects only the essential context.
+We describe the architecture, the composite retrieval algorithm (combining
+semantic similarity, recency decay, and importance scoring), the per-user
+AES-256-GCM encryption model, and a projected cost analysis based on publicly
+available provider pricing.
+Unlike Mem0~\citep{chhikara2025mem0} and MemGPT~\citep{packer2023memgpt},
+MemLayer requires no cloud account, encrypts all memories per-user with
+AES-256-GCM, and integrates natively with Claude Code via the Model Context
+Protocol.
+Under the assumption that memory injection reduces per-query context from a
+full session history ($T_{\text{full}} = 15{,}000$ tokens) to a targeted
+retrieval set ($T_{\text{aug}} = 1{,}000$ tokens), the projected Token
+Compression Ratio is 93.3\% --- consistent with the 90\% reduction reported
+by Mem0 on the LOCOMO benchmark~\citep{chhikara2025mem0}.
+Empirical evaluation on real conversational data is ongoing.
+All code is released at \url{https://github.com/Abhi183/ai-memory-layer}.
 \end{abstract}
 
 % =====================================================================
@@ -117,12 +122,12 @@ different design point: a lightweight, provider-agnostic middleware layer that
 sits between any AI terminal and any LLM provider. We investigate three specific
 research questions:
 \begin{enumerate}
-  \item What token compression ratio does semantic retrieval achieve versus
-    full-context and no-memory baselines, and how does it depend on retrieval
-    quality (Precision@5)?
+  \item What token compression ratio does semantic retrieval project under
+    realistic session-length assumptions, and how does it translate to
+    provider-specific cost savings?
   \item Does composite scoring (combining cosine similarity, recency, and
-    importance) measurably outperform pure cosine similarity, and what weight
-    configuration is optimal?
+    importance) provide a theoretically sound advantage over pure cosine
+    similarity, and what weight configuration is appropriate?
   \item What is the real-money economic impact of memory compression across
     providers, and how does it scale with team size and query volume?
 \end{enumerate}
@@ -139,9 +144,11 @@ Context window capacity has expanded from 4K tokens (GPT-3) to 1M tokens
 (Gemini~1.5~Pro) within three years~\citep{vaswani2017attention}. This trend
 does not render memory compression unnecessary: pricing for frontier models
 scales with input token count, and attention complexity scales quadratically
-with sequence length. At \$3 per million tokens, a 1M-token context costs \$3
-per query. MemLayer reduces average effective context to 1,024 tokens, bringing
-the same query to approximately \$0.003.
+with sequence length. At \$3 per million tokens, a 15,000-token session history
+costs \$0.045 per query. Memory injection targeting 1,000 tokens reduces this
+to \$0.003 per query --- a 93.3\% projected reduction, derived directly from the
+provider's published pricing and the token counts described in
+Section~\ref{sec:evaluation}.
 
 \subsection{MemGPT}
 
@@ -309,8 +316,8 @@ embedding $\mathbf{e}_m$, the composite score is:
 \end{equation}
 where $w_{\text{sim}} = 0.70$, $w_{\text{rec}} = 0.20$, $w_{\text{imp}} = 0.10$,
 and $\alpha_m \in [0, 1]$ is the memory's importance score assigned during
-ingestion. Weights are validated by the ablation study in
-Section~\ref{sec:ablation}.
+ingestion. The rationale for these weights is discussed in
+Section~\ref{sec:weight_rationale}.
 
 The recency decay function is:
 \begin{equation}
@@ -356,10 +363,12 @@ Flash). The Token Compression Ratio is:
   \label{eq:tcr}
 \end{equation}
 Per-query savings accumulate in a time-series store and are surfaced in a
-real-time dashboard, broken down by provider and user. For a 10-developer team
-submitting 50 queries per day on Claude Sonnet~4.5 at \$3.00 per million tokens:
-$S = 10 \times 50 \times 30 \times \frac{13{,}976}{10^6} \times 3.00 \approx \$785$
-saved per month, consistent with Table~\ref{tab:cost}.
+real-time dashboard, broken down by provider and user. Under the assumptions
+described in Section~\ref{sec:evaluation} ($T_{\text{full}} = 15{,}000$,
+$T_{\text{aug}} = 1{,}000$), a 10-developer team submitting 50 queries per day
+on Claude Sonnet~4.5 at \$3.00 per million tokens saves:
+$S = 10 \times 50 \times 30 \times \frac{14{,}000}{10^6} \times 3.00 = \$630$
+per month, consistent with Table~\ref{tab:cost}.
 
 \subsection{Security Design}
 
@@ -430,130 +439,59 @@ continuity: facts learned in a Claude session are retrievable in a subsequent
 GPT-4 session without additional configuration.
 
 % =====================================================================
-\section{Evaluation}
+\section{Projected Cost Analysis}
 \label{sec:evaluation}
 % =====================================================================
 
-\subsection{Experimental Setup}
+\subsection{Assumptions and Methodology}
 
 \noindent
-We construct a synthetic \emph{LOCOMO-style}~\citep{maharana2024locomo}
-evaluation dataset consisting of 50 simulated user profiles, each with 20-turn
-conversation histories covering personal facts (name, preferences, projects),
-technical details (programming languages, frameworks, ongoing tasks), and
-episodic events (meeting notes, decisions). This yields 1,000 total conversation
-turns and approximately 500,000 tokens of raw conversation data. All results
-are reported as mean~$\pm$~std over 5 random seeds (42, 123, 456, 789, 1024).
+The following analysis projects cost savings under two explicit assumptions:
 
-We evaluate four metrics: (1) TCR (Eq.~\ref{eq:tcr}); (2) Precision@5, the
-fraction of retrieved memories rated relevant by an LLM judge among the top~5
-retrieved for a held-out query; (3) Response Quality, rated 1--5 by GPT-4o
-acting as judge on 200 sampled queries across 3 independent rating runs; and
-(4) retrieval latency (ms) from query embedding to context-augmented prompt
-construction.
+\textbf{(1) Baseline full-context token count $T_{\text{full}}$:} we use
+15,000 tokens as a representative session history for a developer conducting
+multi-turn coding sessions. This is a configurable parameter in MemLayer;
+actual values depend on session length and usage pattern. A 30-turn session
+at 500 tokens per turn yields this figure directly.
 
-We compare against three baselines: \textbf{Full-Context} (complete conversation
-history prepended), \textbf{No-Memory} (current query only), and \textbf{Mem0}
-evaluated with the open-source Python library at default configuration.
+\textbf{(2) Memory-augmented context $T_{\text{aug}}$:} we use 1,000 tokens,
+corresponding to MemLayer's default \texttt{max\_tokens=800} injection budget
+plus the current query ($\approx$200 tokens). In practice, $T_{\text{aug}}$
+depends on retrieval hit count and snippet lengths.
 
-\subsection{Token Compression}
+All cost figures use publicly verifiable provider pricing as of April 2026.
+Empirical validation of retrieval quality (Precision@k) on real conversational
+data is planned as future work.
+
+\subsection{Projected Compression}
 \label{sec:compression}
 
 \noindent
-MemLayer achieves 1,024~$\pm$~97 tokens per query, a 93.2\% Token Compression
-Ratio relative to the 15,000-token full-context baseline.
-Table~\ref{tab:compression} and Figure~\ref{fig:tcr_comparison} summarize the
-results. The No-Memory baseline achieves the highest TCR by definition (96.7\%)
-but at the cost of factual continuity: Response Quality drops from
-$4.31{\pm}0.12$ (Full-Context) to $2.18{\pm}0.31$ (No-Memory). MemLayer
-recovers $97.2\%$ of Full-Context quality ($4.19{\pm}0.14$ vs.\ $4.31{\pm}0.12$)
-while compressing tokens by $14.6{\times}$ relative to Full-Context. Mem0
-achieves 1,800~$\pm$~142 tokens per query (88.0\% TCR), 776~tokens more than
-MemLayer per query.
+Table~\ref{tab:compression} summarizes projected token consumption per query
+under the stated assumptions. The No-Memory baseline achieves the highest TCR
+by definition (0.987) but provides no factual continuity across sessions.
+MemLayer projects a TCR of 0.933. The Mem0 token count is taken from
+Chhikara et al.~\citep{chhikara2025mem0}, who report approximately 10\% of
+original context usage on the LOCOMO benchmark. Figure~\ref{fig:tcr_comparison}
+illustrates the projected token counts.
 
 \begin{table}[t]
 \centering
-\caption{Token compression comparison (mean $\pm$ std, $n{=}5$ seeds). MemLayer achieves the highest TCR among methods that preserve response quality above 4.0.}
+\caption{Projected token consumption per query under the assumptions
+$T_{\text{full}} = 15{,}000$ and $T_{\text{aug}} = 1{,}000$.
+The Mem0 token count is taken from Chhikara et al.~\citep{chhikara2025mem0},
+who report approximately 10\% of original context.}
 \label{tab:compression}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
-\begin{tabular}{@{}lrrc@{}}
+\begin{tabular}{@{}lrrl@{}}
 \toprule
-Method & Tokens/Query & TCR & Quality (1--5) \\
+Method & Tokens/Query & TCR & Source \\
 \midrule
-Full-Context    & 15,000$\pm$0      & 0.000 & 4.31$\pm$0.12 \\
-No-Memory       & 500$\pm$85        & 0.967 & 2.18$\pm$0.31 \\
-Mem0            & 1,800$\pm$142     & 0.880 & 3.94$\pm$0.19 \\
-\textbf{MemLayer} & \textbf{1,024$\pm$97} & \textbf{0.932} & \textbf{4.19$\pm$0.14} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-  ybar,
-  width=\columnwidth,
-  height=5.0cm,
-  bar width=0.45cm,
-  symbolic x coords={Full-Context,MemGPT-style,Mem0,MemLayer},
-  xtick=data,
-  xticklabel style={font=\scriptsize, rotate=15, anchor=east},
-  ymin=0, ymax=17000,
-  ylabel={\scriptsize Avg.\ tokens per query},
-  ylabel style={font=\scriptsize},
-  ytick={0,3000,6000,9000,12000,15000},
-  yticklabel style={font=\scriptsize},
-  nodes near coords,
-  nodes near coords style={font=\tiny},
-  every node near coord/.append style={rotate=90, anchor=west},
-  tick align=inside,
-  enlarge x limits=0.18,
-  legend pos=north east,
-  legend style={font=\tiny},
-]
-\addplot[fill=red!40,draw=red!70] coordinates {
-  (Full-Context,15000)
-  (MemGPT-style,3200)
-  (Mem0,1800)
-  (MemLayer,1024)
-};
-\end{axis}
-\end{tikzpicture}
-\caption{Average tokens per query for four approaches. MemLayer achieves a
-93.2\% Token Compression Ratio (TCR) relative to the Full-Context baseline
-(15,000 ${\rightarrow}$ 1,024 tokens).}
-\label{fig:tcr_comparison}
-\end{figure}
-
-\subsection{Retrieval Quality}
-\label{sec:ablation}
-
-\noindent
-Pure cosine similarity (Config~A) gives Precision@5\,=\,0.71. Adding recency
-weighting (Config~B) increases P@5 to 0.79 --- an improvement of 0.08 absolute
-points --- because recent memories are more likely to reflect a user's current
-context. The optimal configuration (Config~C: $w_{\text{sim}}{=}0.70$,
-$w_{\text{rec}}{=}0.20$, $w_{\text{imp}}{=}0.10$) achieves P@5\,=\,0.84.
-Overweighting recency (Config~E: $w_{\text{rec}}{=}0.40$) degrades precision to
-0.77, as semantically relevant but older memories are excessively penalized.
-Table~\ref{tab:ablation} and Figure~\ref{fig:ablation} report the full ablation.
-
-\begin{table}[t]
-\centering
-\caption{Scoring weight ablation on Precision@5. Config~C is the optimal configuration deployed in MemLayer.}
-\label{tab:ablation}
-\small
-\begin{tabular}{@{}ccccc@{}}
-\toprule
-Config & $w_{\text{sim}}$ & $w_{\text{rec}}$ & $w_{\text{imp}}$ & P@5 \\
-\midrule
-A & 1.00 & 0.00 & 0.00 & 0.71 \\
-B & 0.80 & 0.20 & 0.00 & 0.79 \\
-\textbf{C} & \textbf{0.70} & \textbf{0.20} & \textbf{0.10} & \textbf{0.84} \\
-D & 0.60 & 0.30 & 0.10 & 0.81 \\
-E & 0.50 & 0.40 & 0.10 & 0.77 \\
+Full-Context         & 15,000 & 0.000 & Assumption \\
+No-Memory            & $\sim$200   & 0.987 & Current query only \\
+Mem0                 & $\sim$1,500 & 0.900 & \citet{chhikara2025mem0} \\
+MemLayer (projected) & $\sim$1,000 & 0.933 & This work (projected) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -563,48 +501,89 @@ E & 0.50 & 0.40 & 0.10 & 0.77 \\
 \begin{tikzpicture}
 \begin{axis}[
   width=\columnwidth,
-  height=4.5cm,
-  xlabel={\scriptsize Configuration index},
-  ylabel={\scriptsize Precision@5},
+  height=6cm,
+  xlabel={$T_{\text{full}}$ (tokens in full session history)},
+  ylabel={Projected monthly savings (USD)},
   xlabel style={font=\scriptsize},
   ylabel style={font=\scriptsize},
-  xmin=0.5, xmax=5.5,
-  ymin=0.65, ymax=0.90,
-  xtick={1,2,3,4,5},
-  xticklabels={A,B,C,D,E},
+  xmin=2000, xmax=20000,
+  ymin=0,
   xticklabel style={font=\scriptsize},
   yticklabel style={font=\scriptsize},
+  legend style={at={(0.05,0.95)},anchor=north west,font=\tiny},
+  legend entries={Claude Sonnet 4.5 (\$3.00/M), GPT-4o (\$2.50/M), Gemini 2.0 Flash (\$0.10/M)},
   grid=major,
   grid style={dotted,gray!50},
 ]
-\addplot[mark=*,mark options={fill=blue!60},thick,color=blue!70]
-  coordinates {(1,0.71)(2,0.79)(3,0.84)(4,0.81)(5,0.77)};
-\addplot[dashed,thick,color=red!70,domain=0.5:5.5] {0.84};
-\node[font=\tiny,color=red!70] at (axis cs:4.7,0.855) {Optimal};
-% Mark optimal point differently
-\addplot[mark=*,mark size=4pt,mark options={fill=red!60},only marks,color=red!60]
-  coordinates {(3,0.84)};
+% Savings(H) = 10 * 50 * 30 * (H - 1000) / 1e6 * P
+% = 15000 * (H - 1000) / 1e6 * P
+% Claude: 15000 * (H-1000) / 1e6 * 3.00  = 0.045 * (H - 1000)
+% GPT-4o: 15000 * (H-1000) / 1e6 * 2.50  = 0.0375 * (H - 1000)
+% Gemini: 15000 * (H-1000) / 1e6 * 0.10  = 0.0015 * (H - 1000)
+\addplot[thick,color=blue!70,domain=2000:20000,samples=50]
+  {0.045 * (x - 1000)};
+\addplot[thick,color=green!60!black,domain=2000:20000,samples=50]
+  {0.0375 * (x - 1000)};
+\addplot[thick,color=orange!80!black,domain=2000:20000,samples=50]
+  {0.0015 * (x - 1000)};
 \end{axis}
 \end{tikzpicture}
-\caption{Ablation study on composite scoring weights. The optimal configuration (C: $w_{\text{sim}}{=}0.70$, $w_{\text{rec}}{=}0.20$, $w_{\text{imp}}{=}0.10$, shown as filled red circle) achieves P@5\,=\,0.84. Overweighting recency (E) degrades performance.}
-\label{fig:ablation}
+\caption{Projected monthly cost savings as a function of full-context history
+length $H$, for a team of 10 developers submitting 50 queries/day. Lines are
+computed directly from Eq.~\ref{eq:cost}: $\text{Savings}(H) = n \times q
+\times 30 \times (H - 1{,}000) / 10^6 \times P$. No empirical measurement
+is required; the chart reflects the formula for the given inputs.}
+\label{fig:tcr_comparison}
 \end{figure}
+
+\subsection{Scoring Weight Rationale}
+\label{sec:weight_rationale}
+
+\noindent
+The composite scoring function (Eq.~\ref{eq:composite}) requires specifying
+three weights $w_{\text{sim}}$, $w_{\text{rec}}$, and $w_{\text{imp}}$. We
+adopt $w_{\text{sim}}{=}0.70$, $w_{\text{rec}}{=}0.20$, $w_{\text{imp}}{=}0.10$
+based on the following theoretical considerations, subject to empirical
+validation on real conversational data.
+
+\textbf{Semantic similarity dominates (0.70).} The primary retrieval objective
+is topical relevance. A memory about React hooks should rank highest for a
+query about React hooks regardless of when it was captured. Semantic similarity,
+measured as cosine distance in the embedding space of
+\texttt{text-embedding-3-small}, is the most direct proxy for relevance.
+
+\textbf{Recency provides secondary signal (0.20).} In professional AI usage,
+recent memories are more likely to reflect the user's current project context
+than older ones. The 30-day half-life $\tau$ in Eq.~\ref{eq:decay} was chosen
+to keep memories relevant for approximately one project cycle.
+
+\textbf{Importance breaks ties (0.10).} The importance score $\alpha_m$ is
+assigned during ingestion based on fact density and structural signals (e.g.,
+memories containing named entities or explicit decisions are scored higher). A
+low weight prevents importance from overriding topical relevance.
+
+Empirical ablation of these weights on real user data is a planned contribution.
 
 \subsection{Cost Economics}
 \label{sec:cost}
 
 \noindent
-Table~\ref{tab:cost} and Figure~\ref{fig:cost_economics} report monthly API
-costs for a 10-developer team submitting 50 queries per day. MemLayer saves
-\$786/month on Claude Sonnet~4.5 (92.8\% reduction), \$1,116/month on GPT-4o
-(92.8\% reduction), and \$31.50/month on Gemini~2.0~Flash (92.6\% reduction).
-Monthly savings scale linearly with team size: a 50-developer team saves
-approximately \$3,930/month on Claude alone. Ollama, using locally hosted
-models, incurs no API cost in either configuration.
+Table~\ref{tab:cost} and Figure~\ref{fig:cost_economics} report projected
+monthly API costs for a 10-developer team submitting 50 queries per day, under
+the assumptions $T_{\text{full}}{=}15{,}000$ and $T_{\text{aug}}{=}1{,}000$.
+MemLayer projects savings of \$630/month on Claude Sonnet~4.5 (93.3\%
+reduction), \$525/month on GPT-4o (93.3\% reduction), and \$21/month on
+Gemini~2.0~Flash (93.3\% reduction). Monthly savings scale linearly with team
+size: a 50-developer team projects approximately \$3,150/month savings on
+Claude alone. Ollama, using locally hosted models, incurs no API cost in
+either configuration.
 
 \begin{table}[t]
 \centering
-\caption{Monthly API cost for 10 developers, 50 queries/day each (mean 15,000 tokens full-context vs.\ 1,024 tokens with MemLayer).}
+\caption{Projected monthly API cost for 10 developers, 50 queries/day each,
+under assumptions $T_{\text{full}}{=}15{,}000$ tokens and
+$T_{\text{aug}}{=}1{,}000$ tokens per query.
+Provider prices are as of April 2026.}
 \label{tab:cost}
 \footnotesize
 \setlength{\tabcolsep}{3pt}
@@ -612,10 +591,10 @@ models, incurs no API cost in either configuration.
 \toprule
 Provider & Model & w/o MemLayer & w/ MemLayer & Savings \\
 \midrule
-Anthropic & Sonnet~4.5 & \$847     & \$61    & 92.8\% \\
-OpenAI    & GPT-4o     & \$1,203   & \$87    & 92.8\% \\
-Google    & Gemini~2.0 Flash & \$34 & \$2.50 & 92.6\% \\
-Local     & Ollama (llama3) & \$0  & \$0    & ---    \\
+Anthropic & Sonnet~4.5       & \$675.00 & \$45.00 & 93.3\% \\
+OpenAI    & GPT-4o           & \$562.50 & \$37.50 & 93.3\% \\
+Google    & Gemini~2.0 Flash & \$22.50  & \$1.50  & 93.3\% \\
+Local     & Ollama (llama3)  & \$0      & \$0     & ---    \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -631,8 +610,8 @@ Local     & Ollama (llama3) & \$0  & \$0    & ---    \\
   symbolic x coords={Claude Sonnet 4.5, GPT-4o, Gemini 2.0 Flash},
   xtick=data,
   xticklabel style={font=\small},
-  ymin=0, ymax=1400,
-  ylabel={Monthly API Cost (USD)},
+  ymin=0, ymax=750,
+  ylabel={Projected Monthly API Cost (USD)},
   ylabel style={font=\small},
   yticklabel style={font=\small},
   legend style={at={(0.98,0.98)},anchor=north east,font=\small},
@@ -643,88 +622,45 @@ Local     & Ollama (llama3) & \$0  & \$0    & ---    \\
   enlarge x limits=0.25,
 ]
 \addplot[fill=red!50,draw=red!80] coordinates {
-  (Claude Sonnet 4.5,847)
-  (GPT-4o,1203)
-  (Gemini 2.0 Flash,34)
+  (Claude Sonnet 4.5,675)
+  (GPT-4o,562.5)
+  (Gemini 2.0 Flash,22.5)
 };
 \addplot[fill=green!50,draw=green!80] coordinates {
-  (Claude Sonnet 4.5,61)
-  (GPT-4o,87)
-  (Gemini 2.0 Flash,2.5)
+  (Claude Sonnet 4.5,45)
+  (GPT-4o,37.5)
+  (Gemini 2.0 Flash,1.5)
 };
 \end{axis}
 \end{tikzpicture}
-\caption{Monthly API cost for a 10-developer team, 50 queries/day. MemLayer reduces costs by 92.8\% for Claude Sonnet~4.5 (\$847 ${\rightarrow}$ \$61), 92.8\% for GPT-4o (\$1,203 ${\rightarrow}$ \$87), and 92.6\% for Gemini~2.0~Flash (\$34 ${\rightarrow}$ \$2.50).}
+\caption{Projected monthly API cost for a 10-developer team, 50 queries/day,
+under assumptions $T_{\text{full}}{=}15{,}000$ and $T_{\text{aug}}{=}1{,}000$.
+MemLayer reduces projected costs by 93.3\% across all providers: Claude Sonnet~4.5
+(\$675 ${\rightarrow}$ \$45), GPT-4o (\$562.50 ${\rightarrow}$ \$37.50), and
+Gemini~2.0~Flash (\$22.50 ${\rightarrow}$ \$1.50).
+All figures are derived from Eq.~\ref{eq:cost} and publicly available pricing.}
 \label{fig:cost_economics}
 \end{figure*}
 
-\subsection{Latency Analysis}
+\subsection{Latency Considerations}
+\label{sec:latency}
 
 \noindent
-The median end-to-end retrieval latency is 24~ms, dominated by vector search
-(12~ms p50) and re-ranking (8~ms p50). The p99 tail latency of 158~ms is driven
-by occasional pgvector index misses that trigger sequential scan fallback.
-Table~\ref{tab:latency} and Figure~\ref{fig:latency} report the full breakdown.
-LLM generation latency ranges from 800~ms to 5,000~ms across providers; the
-24~ms median overhead represents 3.0\% of response time at best case (fast
-800~ms generation) and 0.5\% at worst case (slow 5,000~ms generation).
-
-\begin{table}[t]
-\centering
-\caption{Retrieval latency percentiles (ms, $n{=}1000$ queries). Total pipeline overhead is 24~ms at median, less than 3\% of LLM generation time.}
-\label{tab:latency}
-\small
-\begin{tabular}{@{}lrrrr@{}}
-\toprule
-Component & p50 & p90 & p95 & p99 \\
-\midrule
-Vector search & 12 & 28 & 41 &  89 \\
-Re-ranking    &  8 & 15 & 22 &  38 \\
-Context build &  4 &  9 & 14 &  31 \\
-\midrule
-\textbf{Total} & \textbf{24} & \textbf{52} & \textbf{77} & \textbf{158} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}
-\begin{axis}[
-  xbar,
-  width=\columnwidth,
-  height=5.0cm,
-  bar width=0.3cm,
-  symbolic y coords={Context build,Re-ranking,Vector search,Total},
-  ytick=data,
-  yticklabel style={font=\scriptsize},
-  xmin=0, xmax=180,
-  xlabel={\scriptsize Latency (ms)},
-  xlabel style={font=\scriptsize},
-  xticklabel style={font=\scriptsize},
-  legend style={at={(0.98,0.05)},anchor=south east,font=\tiny},
-  legend entries={p50, p95},
-  enlarge y limits=0.25,
-]
-\addplot[fill=blue!40,draw=blue!70] coordinates {
-  (12,Vector search)
-  (8,Re-ranking)
-  (4,Context build)
-  (24,Total)
-};
-\addplot[fill=orange!40,draw=orange!70] coordinates {
-  (41,Vector search)
-  (22,Re-ranking)
-  (14,Context build)
-  (77,Total)
-};
-\draw[dashed,thick,color=red!70] ({axis cs:100,Context build}|-{axis cs:100,Total}) -- ({axis cs:100,Total}|-{axis cs:100,Context build});
-\node[font=\tiny,color=red!70,rotate=90] at (axis cs:108,Re-ranking) {LLM baseline};
-\end{axis}
-\end{tikzpicture}
-\caption{Retrieval latency breakdown (p50 and p95). Total median overhead is 24~ms, far below the dashed 100~ms reference line. LLM generation typically requires 800--5,000~ms.}
-\label{fig:latency}
-\end{figure}
+MemLayer's retrieval path consists of three sequential operations: embedding
+the current query, running a pgvector nearest-neighbor search, and building the
+augmented context string. The pgvector documentation reports sub-10~ms p50
+latency for HNSW-indexed collections of up to 100{,}000 vectors on commodity
+hardware~\citep{pgvector2023}. At the scale typical of individual users
+(hundreds to low thousands of memories), query embedding dominates: the OpenAI
+\texttt{text-embedding-3-small} API reports median response times of 50--200~ms
+depending on load, while the local \texttt{all-MiniLM-L6-v2} fallback runs in
+under 20~ms on CPU. End-to-end retrieval latency is dominated by the embedding
+call when using the OpenAI API and by vector search when using the local
+embedding model. LLM generation latency across the supported providers ranges
+from approximately 800~ms to 5,000~ms, making retrieval overhead a minor
+fraction of total response time in either configuration. We do not report
+specific latency percentiles here, as they depend heavily on network conditions,
+API load, and hardware that are not fixed in this work.
 
 % =====================================================================
 \section{Discussion}
@@ -747,40 +683,36 @@ systems~\citep{lewis2020retrieval}.
 \subsection{Comparison with Mem0}
 
 \noindent
-MemLayer achieves higher response quality than Mem0 ($4.19{\pm}0.14$ vs.\
-$3.94{\pm}0.19$ LLM-as-judge) and lower token consumption (1,024 vs.\ 1,800
-tokens per query). Mem0 does not provide provider-specific cost tracking,
-requires a managed cloud account, and stores memories in plaintext in a
-cloud-hosted database. MemLayer runs entirely on the user's machine. The
-sentence-transformer embedding model~\citep{reimers2019sentence} serves as a
-local fallback when no OpenAI API key is configured, enabling fully offline
-operation.
+Mem0 reports approximately 90\% token reduction on the LOCOMO
+benchmark~\citep{chhikara2025mem0}. MemLayer targets similar compression
+ratios through a comparable extract-retrieve pipeline, with the additional
+design constraints of per-user encryption and provider-agnostic CLI
+integration. Unlike Mem0, MemLayer runs entirely on the user's machine and
+does not require a managed cloud account. The
+\texttt{sentence-transformer} local embedding model~\citep{reimers2019sentence}
+provides a fully offline fallback when no API key is configured.
 
 \subsection{Limitations}
 
 \noindent
 We state these plainly rather than burying them.
 
-\textbf{Cold start.} First-session quality equals the No-Memory baseline.
-The system needs 5--10 captured interactions before retrieval meaningfully
-improves quality over sending the query alone.
+\textbf{Cold start.} The first session provides no memory benefit; the system
+must capture 5--10 interactions before retrieval meaningfully adds context.
 
-\textbf{Summarization errors.} The gpt-4o-mini extraction step occasionally
-drops numeric facts such as version numbers and dates. We measured a 6.2\%
-fact omission rate on structured technical conversations containing three or
-more numeric entities per turn.
+\textbf{Summarization accuracy.} The gpt-4o-mini extraction step may drop
+numeric facts such as version numbers and dates. We have not yet quantified
+the omission rate on real conversational data; this is a planned measurement.
 
 \textbf{Memory staleness.} The importance score in Eq.~\ref{eq:composite} does
-not handle contradictions. If a user's project transitions from in-progress to
-completed, the old ``in-progress'' memory persists with reduced recency weight
-rather than being retracted. A contradiction-detection pass is needed for
-high-stakes use cases.
+not handle contradictions: if a fact changes (e.g., a project completes), the
+old memory persists with reduced recency weight rather than being retracted.
+A contradiction-detection pass is needed.
 
-\textbf{Benchmark scope.} 50 synthetic conversations cannot represent the full
-distribution of professional AI use. The synthetic generation process used
-GPT-4o, which may produce conversations whose structure is easier for the same
-GPT-4o judge to evaluate, introducing potential circularity. We are collecting
-real usage data from open-source contributors to address this.
+\textbf{No empirical evaluation.} The retrieval quality metrics (Precision@k,
+response quality) cited in prior work such as Mem0 were measured on LOCOMO.
+We have not yet run MemLayer on a real conversational benchmark. This is the
+primary gap between this paper and a complete empirical evaluation.
 
 % =====================================================================
 \section{Conclusion}
@@ -788,14 +720,18 @@ real usage data from open-source contributors to address this.
 % =====================================================================
 
 \noindent
-MemLayer demonstrates that per-user encrypted memory compression achieves
-93.2\% token reduction with Precision@5\,=\,0.84 and 24~ms median retrieval
-overhead --- less than 3\% of typical LLM generation time. The integrated
-economics engine provides the first provider-specific ROI dashboard for AI
-memory systems, quantifying savings of \$786/month for a 10-developer team
-on Claude Sonnet~4.5. Unlike prior solutions, MemLayer runs entirely on the
-user's machine, wraps any AI CLI, and requires no external cloud account.
-Future work includes knowledge graph extraction for relational memory and
+MemLayer presents a provider-agnostic, encrypted memory middleware layer for
+LLM terminals. The composite retrieval algorithm combines semantic similarity,
+recency decay, and importance scoring. The integrated economics engine computes
+provider-specific cost savings from real usage data. Under the assumption that
+memory injection reduces per-query context from a full session history to a few
+hundred tokens of relevant facts, the projected savings exceed 93\% of raw
+context cost --- consistent with the 90\% reduction reported by Mem0 on the
+LOCOMO benchmark~\citep{chhikara2025mem0}. Unlike prior solutions, MemLayer
+runs entirely on the user's machine, wraps any AI CLI, and requires no external
+cloud account. Empirical validation of retrieval quality and production latency
+measurements on real conversational data are the primary directions for future
+work, alongside knowledge graph extraction for relational memory and
 contradiction detection, on-device embedding models for air-gapped deployments,
 and federated team memory pools for shared AI workspaces.
 
