@@ -174,6 +174,39 @@ async def explain_context(
     return explain_response
 
 
+@router.post("/forget")
+async def forget_memories(
+    data: dict,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Invalidate memories matching a plain-text description.
+
+    Searches decrypted summaries and extracted_facts for the given description
+    string and marks matching memories INACTIVE so they are excluded from all
+    future retrievals. Useful after a project pivot, technology switch, or any
+    other state change where previously captured context is now stale.
+
+    Body: {"description": "short description of the stale fact"}
+    Returns: {"invalidated": N}
+    """
+    description = (data.get("description") or "").strip()
+    if not description:
+        raise HTTPException(status_code=400, detail="description is required")
+
+    from app.models.user import User as UserModel
+    from sqlalchemy import select as sa_select
+    result = await db.execute(
+        sa_select(UserModel.encryption_salt).where(UserModel.id == user.id)
+    )
+    salt = result.scalar_one()
+
+    count = await memory_service.forget(db, user.id, description, salt)
+    log.info("memory.forget", user_id=str(user.id), description=description, invalidated=count)
+    return {"invalidated": count}
+
+
 @router.get("/{memory_id}", response_model=MemoryRead)
 async def get_memory(
     memory_id: uuid.UUID,

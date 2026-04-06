@@ -151,6 +151,35 @@ async def search_async(query: str, limit: int = 5) -> list[dict[str, Any]]:
         return []
 
 
+async def forget_async(description: str) -> dict[str, Any]:
+    """Mark memories matching *description* as INACTIVE.
+
+    Calls POST /api/v1/memory/forget.
+    Returns {"invalidated": N} on success, or {} on failure.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            resp = await client.post(
+                f"{config.api_url}/api/v1/memory/forget",
+                headers=_headers(),
+                json={"description": description},
+            )
+            resp.raise_for_status()
+            return resp.json()
+    except httpx.ConnectError:
+        logger.warning(
+            "Memory server not reachable at %s — cannot forget memories.",
+            config.api_url,
+        )
+        return {}
+    except httpx.HTTPStatusError as exc:
+        logger.warning("Forget request failed: %s", exc)
+        return {}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Unexpected error during forget: %s", exc)
+        return {}
+
+
 async def get_analytics_summary_async() -> dict[str, Any]:
     """Fetch analytics / economics summary.
 
@@ -242,6 +271,10 @@ def capture(
 
 def search(query: str, limit: int = 5) -> list[dict[str, Any]]:
     return asyncio.run(search_async(query, limit))
+
+
+def forget(description: str) -> dict[str, Any]:
+    return asyncio.run(forget_async(description))
 
 
 def get_analytics_summary() -> dict[str, Any]:

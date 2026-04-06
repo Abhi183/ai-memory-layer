@@ -3,6 +3,7 @@ Memory CRUD service — handles create, read, update, delete with encryption.
 All content is encrypted before write and decrypted after read.
 """
 
+import json
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional
@@ -200,6 +201,61 @@ class MemoryService:
         )
         await db.commit()
         return result.rowcount > 0
+
+    async def forget(
+        self,
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        description: str,
+        salt: str,
+    ) -> int:
+        """
+        Mark memories matching *description* as INACTIVE (explicit `mem-ai forget`).
+
+        Searches decrypted summaries and extracted_facts for a case-insensitive
+        match against the description string.  Returns the count of invalidated
+        memories so the CLI can report what was found.
+
+        This is the user-facing counterpart to the automatic invalidation that
+        fires during pipeline processing when the LLM detects a contradiction.
+        """
+        q = (
+            select(Memory)
+            .where(
+                and_(
+                    Memory.user_id == user_id,
+                    Memory.status == MemoryStatus.ACTIVE,
+                )
+            )
+        )
+        result = await db.execute(q)
+        candidates = result.scalars().all()
+
+        needle = description.lower()
+        count = 0
+        for mem in candidates:
+            # Check extracted_facts (stored as plaintext JSON)
+            facts_text = ""
+            if mem.extracted_facts:
+                facts_text = json.dumps(mem.extracted_facts).lower()
+
+            # Check decrypted summary
+            summary_text = ""
+            if mem.summary:
+                try:
+                    summary_text = decrypt(mem.summary, salt).lower()
+                except Exception:
+                    pass
+
+            if needle in facts_text or needle in summary_text:
+                mem.status = MemoryStatus.INACTIVE
+                count += 1
+                log.info("memory_forgotten", memory_id=str(mem.id))
+
+        if count:
+            await db.commit()
+
+        return count
 
     # ── Helpers ────────────────────────────────────────────────────────────────
 

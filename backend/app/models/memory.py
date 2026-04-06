@@ -24,6 +24,7 @@ class MemoryStatus(str, enum.Enum):
     PROCESSING = "processing"   # In the pipeline
     ACTIVE = "active"           # Processed and searchable
     ARCHIVED = "archived"       # Too old or manually archived
+    INACTIVE = "inactive"       # Superseded by a newer contradicting fact
     FAILED = "failed"           # Pipeline failure
 
 

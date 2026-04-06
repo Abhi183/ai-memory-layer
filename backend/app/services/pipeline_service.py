@@ -34,7 +34,16 @@ log = structlog.get_logger()
 FACT_EXTRACTION_PROMPT = """You are a memory extraction assistant.
 Given the following AI conversation, extract the key facts about the USER (not general knowledge).
 Focus on: preferences, personal details, workplace, projects, goals, relationships, skills.
-Return a JSON object with key "facts" containing a list of short fact strings.
+
+Also identify if any facts in this conversation CONTRADICT or SUPERSEDE something that was
+previously true. For example: a user switching frameworks, completing a project, or changing
+a preference.
+
+Return a JSON object with exactly two keys:
+  "facts": list of short strings describing NEW facts about the user
+  "invalidates_previous_fact": list of short strings describing OLD facts that are now stale
+    (e.g. "User was using React" when user has switched to Vue). Leave empty if nothing is invalidated.
+
 Return ONLY valid JSON, no other text.
 
 Conversation:
@@ -104,9 +113,13 @@ class PipelineService:
             # Step 1: Decrypt
             plaintext = decrypt(memory.content, salt)
 
-            # Step 2: Extract facts
-            facts, fact_usage = await self._extract_facts(plaintext)
+            # Step 2: Extract facts + invalidation hints
+            facts, invalidates, fact_usage = await self._extract_facts(plaintext)
             usage.add(fact_usage.input_tokens, fact_usage.output_tokens)
+
+            # Invalidate stale facts from prior memories when the LLM detected a contradiction
+            if invalidates:
+                await self._invalidate_stale_facts(db, memory.user_id, invalidates)
 
             # Step 3: Summarize
             summary, sum_usage = await self._summarize(plaintext)
@@ -129,7 +142,10 @@ class PipelineService:
             vector = await embedding_service.embed(primary_chunk)
 
             # Step 6: Persist results
-            memory.extracted_facts = {"facts": facts}
+            memory.extracted_facts = {
+                "facts": facts,
+                "invalidates_previous_fact": invalidates,
+            }
             memory.summary = encrypt(summary, salt) if summary else None
             memory.memory_type = memory_type
             memory.token_count = embedding_service.count_tokens(plaintext)
@@ -173,10 +189,13 @@ class PipelineService:
         wait=wait_exponential(multiplier=1, min=2, max=10),
         retry=retry_if_exception_type(Exception),
     )
-    async def _extract_facts(self, content: str) -> tuple[list[str], IngestionTokenUsage]:
+    async def _extract_facts(
+        self, content: str
+    ) -> tuple[list[str], list[str], IngestionTokenUsage]:
+        """Returns (facts, invalidates_previous_fact, usage)."""
         usage = IngestionTokenUsage()
         if not settings.openai_api_key:
-            return [], usage
+            return [], [], usage
         try:
             client = AsyncOpenAI(api_key=settings.openai_api_key)
             response = await client.chat.completions.create(
@@ -187,17 +206,67 @@ class PipelineService:
                         "content": FACT_EXTRACTION_PROMPT.format(content=content[:3000]),
                     }
                 ],
-                max_tokens=500,
+                response_format={"type": "json_object"},
+                max_tokens=600,
                 temperature=0.1,
             )
             if response.usage:
                 usage.add(response.usage.prompt_tokens, response.usage.completion_tokens)
             raw = response.choices[0].message.content.strip()
             data = json.loads(raw)
-            return data.get("facts", []), usage
+            facts = data.get("facts", [])
+            invalidates = data.get("invalidates_previous_fact", [])
+            return facts, invalidates, usage
         except Exception as exc:
             log.warning("fact_extraction_failed", error=str(exc))
-            return [], usage
+            return [], [], usage
+
+    async def _invalidate_stale_facts(
+        self,
+        db: AsyncSession,
+        user_id: uuid.UUID,
+        stale_descriptions: list[str],
+    ) -> int:
+        """
+        Find memories whose extracted_facts contain any of the stale descriptions
+        (semantic search via simple substring match on fact text) and mark them
+        status=INACTIVE so they are excluded from future retrievals.
+
+        Returns the count of memories invalidated.
+        """
+        from sqlalchemy import select, cast
+        from sqlalchemy.dialects.postgresql import JSONB
+
+        invalidated = 0
+        for desc in stale_descriptions:
+            # Search active memories whose fact text overlaps with the stale description
+            result = await db.execute(
+                select(Memory).where(
+                    Memory.user_id == user_id,
+                    Memory.status == MemoryStatus.ACTIVE,
+                    # JSONB containment: check if any fact string is a substring of desc
+                    # Using a simple ilike on the JSONB text representation
+                    Memory.extracted_facts.cast(
+                        db.bind.dialect.colspecs.get(type(Memory.extracted_facts), JSONB)
+                    ).astext.ilike(f"%{desc[:80]}%"),  # type: ignore[attr-defined]
+                )
+            )
+            stale_memories = result.scalars().all()
+
+            for mem in stale_memories:
+                mem.status = MemoryStatus.INACTIVE
+                invalidated += 1
+                log.info(
+                    "memory_invalidated",
+                    memory_id=str(mem.id),
+                    stale_desc=desc[:80],
+                )
+
+        if invalidated:
+            await db.commit()
+            log.info("stale_facts_invalidated", count=invalidated)
+
+        return invalidated
 
     @retry(
         stop=stop_after_attempt(3),

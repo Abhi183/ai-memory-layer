@@ -1,0 +1,9 @@
+# MemLayer benchmark dependencies — pinned for reproducibility
+# Install order matters: torch → faiss-cpu → sentence-transformers → rest
+torch==2.3.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+faiss-cpu==1.8.0
+sentence-transformers==2.7.0
+datasets==2.20.0
+tiktoken==0.7.0
+numpy==1.26.4
+rich==13.7.1

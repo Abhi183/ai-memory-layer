@@ -261,6 +261,66 @@ def stats() -> None:
 
 
 # ---------------------------------------------------------------------------
+# forget
+# ---------------------------------------------------------------------------
+
+
+@cli.command()
+@click.argument("description")
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    default=False,
+    help="Skip confirmation prompt.",
+)
+def forget(description: str, yes: bool) -> None:
+    """Invalidate memories that match a description.
+
+    Use this when a fact has changed and you want to prevent stale context
+    from being injected into future queries (e.g. after a project pivot or
+    a technology switch).
+
+    Matched memories are marked INACTIVE and will no longer appear in
+    retrieval results. The raw content is preserved for audit purposes.
+
+    Examples:\n
+      mem-ai forget "React hooks project"\n
+      mem-ai forget "Using PostgreSQL 13" --yes\n
+      mem-ai forget "Project deadline is Q2"
+    """
+    if not yes:
+        console.print(
+            f"[yellow]About to invalidate memories matching:[/yellow] [bold]{description!r}[/bold]"
+        )
+        confirmed = click.confirm("Continue?", default=False)
+        if not confirmed:
+            console.print("[dim]Cancelled.[/dim]")
+            return
+
+    result = client.forget(description)
+
+    if not result:
+        console.print(
+            "[yellow]Could not reach memory server.[/yellow] "
+            f"Check that it is running at [dim]{config.api_url}[/dim]"
+        )
+        return
+
+    n = result.get("invalidated", 0)
+    if n == 0:
+        console.print(
+            "[yellow]No matching memories found.[/yellow] "
+            "Try a shorter or broader search term."
+        )
+    else:
+        console.print(
+            f"[green]Invalidated {n} memor{'y' if n == 1 else 'ies'}.[/green] "
+            "They will no longer be injected into future queries."
+        )
+
+
+# ---------------------------------------------------------------------------
 # auth login
 # ---------------------------------------------------------------------------
 
